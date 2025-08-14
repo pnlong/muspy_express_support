@@ -106,6 +106,23 @@ KNOWN_PROGRAMS = [k for k, v in PROGRAM_INSTRUMENT_MAP.items() if v is not None]
 # HELPER FUNCTIONS
 ##################################################
 
+# get id from path
+def get_id_from_path(path: str) -> str:
+    """
+    Get the id from a path.
+
+    Parameters
+    ----------
+    path : str
+        Path to the original expressive pickle file
+
+    Returns
+    -------
+    str
+        The id from the path
+    """
+    return basename(path).split(".")[0]
+
 # tempo mapping functions
 def qpm_tempo_mapper(qpm: float) -> str:
     """
@@ -765,10 +782,10 @@ if __name__ == "__main__":
         # get musescore paths
         print("Determining MuseScore paths...")
         musescore_paths = glob(f"{args.musescore_dir}/**/*.mscz", recursive = True)
-        basename_to_musescore_path = {basename(path)[:-len(".mscz")]: path for path in musescore_paths}
-        pdmx["path_mscz"] = pdmx["path_mxl"].apply(lambda path_mxl: basename_to_musescore_path.get(basename(path_mxl)[:-len(".mxl")], None))
+        id_to_musescore_path = {id_: path for path, id_ in zip(musescore_paths, map(get_id_from_path, musescore_paths))}
+        pdmx["path_mscz"] = pdmx["path_mxl"].apply(lambda path_mxl: id_to_musescore_path.get(get_id_from_path(path_mxl), None))
         output_columns.insert(output_columns.index("path_mxl") + 1, "path_mscz") # add to output columns
-        del musescore_paths, basename_to_musescore_path
+        del musescore_paths, id_to_musescore_path
         print("Determined MuseScore paths.")
 
         # get output paths
@@ -919,7 +936,7 @@ if __name__ == "__main__":
         _ = list(tqdm(iterable = pool.imap_unordered(
             func = extract_helper,
             iterable = indices_to_complete,
-            chunksize = 1
+            chunksize = 1,
         ),
         desc = "Extracting",
         total = len(indices_to_complete)))

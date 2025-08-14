@@ -12,18 +12,14 @@ import multiprocessing
 import tqdm
 import argparse
 from os.path import exists
-from os import mkdir
 import pickle
 from typing import List
-from re import sub
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 from os.path import dirname, realpath
 import sys
 sys.path.insert(0, dirname(realpath(__file__)))
 
-from extract_expression_text import OUTPUT_DIR, DATASET_NAME, NA_VALUE
+from extract_expression_text import OUTPUT_DIR, DATASET_NAME, NA_VALUE, get_id_from_path
 
 ##################################################
 
@@ -32,37 +28,8 @@ from extract_expression_text import OUTPUT_DIR, DATASET_NAME, NA_VALUE
 ##################################################
 
 # data constants
-OUTPUT_COLUMN_NAMES = ["song_idx", "track_idx", "expression_text_type", "expression_text_value", "duration_time_steps", "duration_seconds", "duration_beats"]
-DURATION_COLUMN_TO_USE = "duration_beats"
-
-# figure constants
-LARGE_PLOTS_DPI = 200
-ALL_TYPE_NAME = "AllTypes" # name of all features plot name
-
-# colors
-TEXT_GREEN = "#5e813f"
-TEMPORAL_PURPLE = "#68349a"
-SPANNER_BLUE = "#4f71be"
-DYNAMIC_GOLD = "#b89230"
-SYMBOL_ORANGE = "#ff624c"
-SYSTEM_SALMON = "#a91b0d"
-ALL_BROWN = "#964b00"
-EXPRESSION_TEXT_COLORS = {
-    ALL_TYPE_NAME: ALL_BROWN,
-    "Lyric": TEXT_GREEN,
-    "Tempo": TEMPORAL_PURPLE,
-    "Dynamic": DYNAMIC_GOLD,
-    "TimeSignature": SYSTEM_SALMON,
-    "Text": TEXT_GREEN,
-    "KeySignature": SYSTEM_SALMON,
-    "Barline": SYSTEM_SALMON,
-    "Articulation": SYMBOL_ORANGE,
-    "HairPin": DYNAMIC_GOLD,
-    "RehearsalMark": TEXT_GREEN,
-    "Slur": SPANNER_BLUE,
-    "Fermata": TEMPORAL_PURPLE,
-    "Pedal": SPANNER_BLUE,
-}
+OUTPUT_COLUMN_NAMES = ["id", "track_idx", "expression_text_type", "expression_text_value", "duration_time_steps", "duration_seconds", "duration_beats"]
+EXPRESSION_TEXT_TYPE_DATASET_NAME = "expression_text_type"
 
 ##################################################
 
@@ -70,46 +37,7 @@ EXPRESSION_TEXT_COLORS = {
 # HELPER FUNCTIONS
 ##################################################
 
-# get the x label from the duration column in use
-def get_x_label(duration_column_to_use: str) -> str:
-    """
-    Get the x label from the duration column in use.
 
-    Parameters
-    ----------
-    duration_column_to_use : str
-        The duration column to use
-
-    Returns
-    -------
-    str
-        The x label from the duration column in use
-    """
-    if duration_column_to_use == "duration_time_steps":
-        return "Time Steps"
-    elif duration_column_to_use == "duration_seconds":
-        return "Seconds"
-    elif duration_column_to_use == "duration_beats":
-        return "Beats"
-    else:
-        raise ValueError(f"Invalid duration column to use: {duration_column_to_use}")
-
-# function to split camel case into separate words
-def split_camel_case(text: str) -> str:
-    """
-    Split a camel case string into separate words.
-
-    Parameters
-    ----------
-    text : str
-        String to split
-
-    Returns
-    -------
-    str
-        String with camel case split into separate words
-    """
-    return sub(pattern = r"([a-z])([A-Z])", repl = r"\1 \2", string = text) # find instances where a lowercase letter is followed by an uppercase letter and insert a space after the lowercase letter
 
 ##################################################
 
@@ -117,7 +45,7 @@ def split_camel_case(text: str) -> str:
 # MAIN EXTRACT EXPRESSION TEXT TYPES FUNCTION
 ##################################################
 
-def extract_expression_text_types(song_output: List[dict], song_idx: int) -> dict:
+def extract_expression_text_types(song_output: List[dict]) -> dict:
     """
     Extract expression text types from a single PDMX entry.
 
@@ -125,8 +53,6 @@ def extract_expression_text_types(song_output: List[dict], song_idx: int) -> dic
     ----------
     song_output : List[dict]
         List of track dictionaries from a single PDMX entry
-    song_idx : int
-        Index of the song in the dataset
 
     Returns
     -------
@@ -145,7 +71,6 @@ def extract_expression_text_types(song_output: List[dict], song_idx: int) -> dic
         expression_text = track_output["expression_text"]
 
         # add static columns
-        output["song_idx"].extend([song_idx] * len(expression_text))
         output["track_idx"].extend([track_idx] * len(expression_text))
         
         # add dynamic columns
@@ -160,45 +85,6 @@ def extract_expression_text_types(song_output: List[dict], song_idx: int) -> dic
 
     # return output dictionary
     return output
-
-##################################################
-
-
-# PLOT EXPRESSION TEXT TYPES
-##################################################
-
-def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str):
-    """
-    Plot expression text types as a boxplot.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", DURATION_COLUMN_TO_USE]
-    output_filepath : str
-        Path to output file
-    """
-    
-    # create the horizontal boxplot
-    plt.figure(figsize = (10, 8))
-    sns.boxplot(data = data, x = DURATION_COLUMN_TO_USE, y = "expression_text_type", orient = "h")
-    
-    # format the y-axis labels after plotting
-    ax = plt.gca()
-    y_labels = [split_camel_case(label.get_text()) for label in ax.get_yticklabels()]
-    ax.set_yticklabels(labels = y_labels)
-    
-    # set labels
-    plt.xlabel(get_x_label(duration_column_to_use = DURATION_COLUMN_TO_USE))
-    plt.ylabel("Expression Text Type")
-    
-    # adjust layout to prevent label cutoff
-    plt.tight_layout()
-    
-    # save the plot
-    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
-    plt.close()
-    
 
 ##################################################
 
@@ -235,13 +121,13 @@ if __name__ == "__main__":
         """
         parser = argparse.ArgumentParser(prog = "Summarize Expression Text Statistics", description = "Summarize expression text statistics.") # create argument parser
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
+        parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{DATASET_NAME}.csv", help = "Path to input file.")
         parser.add_argument("--jobs", type = int, default = int(multiprocessing.cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
         if not exists(args.output_dir):
             raise FileNotFoundError(f"Output directory not found: {args.output_dir}")
-        args.input_filepath = f"{args.output_dir}/{DATASET_NAME}.csv"
-        if not exists(args.input_filepath):
+        elif not exists(args.input_filepath):
             raise FileNotFoundError(f"Input file not found: {args.input_filepath}")
         return args # return parsed arguments
     args = parse_args()
@@ -252,20 +138,20 @@ if __name__ == "__main__":
     print("Completed reading in input data.")
 
     # write column names
-    output_filepath = f"{args.output_dir}/expression_text_type_durations.csv"
+    output_filepath = f"{args.output_dir}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv"
     print("Writing column names...")
     if not exists(output_filepath) or args.reset:
         pd.DataFrame(columns = OUTPUT_COLUMN_NAMES).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = True, index = False, mode = "w")
-        already_completed_indices = set()
+        already_completed_ids = set()
         print(f"Wrote column names to {output_filepath}, no paths have been completed yet.")
     else:
-        already_completed_indices = set(pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False, usecols = ["song_idx"])["song_idx"])
-        print(f"Column names already written to {output_filepath}, {len(already_completed_indices)} paths have been completed.")
+        already_completed_ids = set(pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False, usecols = ["id"])["id"])
+        print(f"Column names already written to {output_filepath}, {len(already_completed_ids)} paths have been completed.")
 
     # determine paths to complete
     print("Determining paths to complete...")
-    indices_to_complete = [i for i in dataset.index if i not in already_completed_indices]
-    del already_completed_indices
+    indices_to_complete = [i for i, id_ in enumerate(map(get_id_from_path, dataset["path_expression"])) if id_ not in already_completed_ids]
+    del already_completed_ids
     print(f"{len(indices_to_complete)} paths remaining to complete.")
 
     ##################################################
@@ -294,8 +180,8 @@ if __name__ == "__main__":
             song_output = pickle.load(file = pickle_file)
 
         # extract expression text types
-        result = extract_expression_text_types(song_output = song_output, song_idx = i)
-        result["path"] = path_expression
+        result = extract_expression_text_types(song_output = song_output)
+        result["id"] = [get_id_from_path(path = path_expression)] * len(result["track_idx"])
 
         # write to csv
         pd.DataFrame(data = result, columns = OUTPUT_COLUMN_NAMES).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
@@ -318,7 +204,7 @@ if __name__ == "__main__":
             _ = list(tqdm(iterable = pool.imap_unordered(
                 func = extract_expression_text_types_helper,
                 iterable = indices_to_complete,
-                chunksize = 1
+                chunksize = 1,
             ),
             desc = "Extracting Expression Text Types",
             total = len(indices_to_complete)))
@@ -326,7 +212,6 @@ if __name__ == "__main__":
 
     # expression text types already extracted
     else:
-
         print("Expression text types already extracted.")
 
     # free up memory
@@ -335,21 +220,47 @@ if __name__ == "__main__":
     ##################################################
 
 
-    # LOAD IN DATA, MAKE PLOTS
+    # LOAD IN DATA, SUMMARIZE
     ##################################################
 
-    # create plots directory
-    plots_dir = f"{args.output_dir}/plots"
-    if not exists(plots_dir):
-        mkdir(plots_dir)
-
     # read in data
-    results = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
+    results = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False)
+    results_expression_text = results[results["expression_text_type"] != "Lyric"]
+    results_lyrics = results[results["expression_text_type"] == "Lyric"]
 
-    # make duration boxplot
-    print("Making expression text type durations boxplot...")
-    plot_expression_text_types_boxplot(data = results, output_filepath = f"{plots_dir}/expression_text_type_durations.pdf")
-    print("Completed making expression text type durations boxplot.")
+    # output summary statistics
+    line = "=" * 60
+    print(line)
+    print("SUMMARY STATISTICS:")
+
+    # counts
+    print(line)
+    print(f"Number of expression text tokens: {len(results_expression_text)}")
+    print(f"Number of lyric tokens: {len(results_lyrics)}")
+    expression_text_ids = set(results_expression_text["id"].unique())
+    print(f"Number of songs with expression text: {len(expression_text_ids)}")
+    lyric_ids = set(results_lyrics["id"].unique())
+    print(f"Number of songs with lyrics: {len(lyric_ids)}")
+    print(f"Number of songs with both expression text and lyrics: {len(expression_text_ids & lyric_ids)}")
+    
+    # averages
+    print(line)
+    results_expression_text_counts = results_expression_text[["id", "track_idx"]].groupby(by = ["id", "track_idx"]).size().reset_index(name = "count")
+    print(f"Average number of expression text per song: {results_expression_text_counts[['id', 'count']].groupby(by = 'id').sum().mean():.2f}")
+    print(f"Average number of expression text per track: {results_expression_text_counts['count'].mean():.2f}")
+    results_lyrics_counts = results_lyrics[["id", "track_idx"]].groupby(by = ["id", "track_idx"]).size().reset_index(name = "count")
+    print(f"Average number of lyrics per song: {results_lyrics_counts[['id', 'count']].groupby(by = 'id').sum().mean():.2f}")
+    print(f"Average number of lyrics per track: {results_lyrics_counts['count'].mean():.2f}")
+    
+    # mode
+    print(line)
+    print("Most Common Expression Text Types:")
+    most_common_types = results["expression_text_type"].value_counts(sort = True, ascending = False)
+    for expression_text_type in most_common_types.index:
+        print(f"  - {expression_text_type}: {most_common_types[expression_text_type]}")
+
+    # close
+    print(line)
 
     ##################################################
 

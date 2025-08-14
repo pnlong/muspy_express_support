@@ -142,13 +142,13 @@ if __name__ == "__main__":
         """
         parser = argparse.ArgumentParser(prog = "Summarize Expression Text Statistics", description = "Summarize expression text statistics.") # create argument parser
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
+        parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{DATASET_NAME}.csv", help = "Path to input file.")
         parser.add_argument("--jobs", type = int, default = int(multiprocessing.cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
         if not exists(args.output_dir):
             raise FileNotFoundError(f"Output directory not found: {args.output_dir}")
-        args.input_filepath = f"{args.output_dir}/{DATASET_NAME}.csv"
-        if not exists(args.input_filepath):
+        elif not exists(args.input_filepath):
             raise FileNotFoundError(f"Input file not found: {args.input_filepath}")
         return args # return parsed arguments
     args = parse_args()
@@ -216,17 +216,65 @@ if __name__ == "__main__":
     # EXTRACT DATA WITH MULTIPROCESSING
     ##################################################
 
-    # use multiprocessing
-    print("Summarizing expression text...")
-    with multiprocessing.Pool(processes = args.jobs) as pool:
-        _ = list(tqdm(iterable = pool.imap_unordered(
-            func = summarize_helper,
-            iterable = indices_to_complete,
-            chunksize = 1
-        ),
-        desc = "Summarizing",
-        total = len(indices_to_complete)))
-    print("Summarized expression text.")
+    # summarize if necessary
+    if len(indices_to_complete) > 0:
+
+        # use multiprocessing
+        print("Summarizing expression text...")
+        with multiprocessing.Pool(processes = args.jobs) as pool:
+            _ = list(tqdm(iterable = pool.imap_unordered(
+                func = summarize_helper,
+                iterable = indices_to_complete,
+                chunksize = 1
+            ),
+            desc = "Summarizing",
+            total = len(indices_to_complete)))
+        print("Summarized expression text.")
+
+    # if already summarized
+    else:
+        print("Expression text already summarized.")
+
+    # free up memory
+    del dataset, indices_to_complete, summarize_helper
+
+    ##################################################
+
+
+    # LOAD IN DATA, OUTPUT SUMMARY STATISTICS
+    ##################################################
+
+    # read in data
+    results = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False)
+
+    # output summary statistics
+    line = "=" * 60
+    print(line)
+    print("SUMMARY STATISTICS:")
+
+    # expression text
+    print(line)
+    print(f"Number of songs with expression text: {results['has_expression_text'].sum()}")
+    print(f"Percentage of songs with expression text: {results['has_expression_text'].mean() * 100:.2f}%")
+    print(f"Average number of expression text per song: {results['total_n_expression_text'].mean():.2f}")
+    print(f"Average number of expression text per track: {results['mean_n_expression_text'].mean():.2f}")
+    
+    # lyrics
+    print(line)
+    print(f"Number of songs with lyrics: {results['has_lyrics'].sum()}")
+    print(f"Percentage of songs with lyrics: {results['has_lyrics'].mean() * 100:.2f}%")
+    print(f"Average number of lyrics per song: {results['total_n_lyrics'].mean():.2f}")
+    print(f"Average number of lyrics per track: {results['mean_n_lyrics'].mean():.2f}")
+
+    # statistics
+    print(line)
+    print(f"Mean expression text density: {results['mean_expression_text_density'].mean():.2f}")
+    print(f"Mean expression text sparsity: {results['mean_expression_text_sparsity'].mean():.2f}")
+    print(f"Mean expression text duration: {results['mean_expression_text_duration'].mean():.2f}")
+    print(f"Most common expression text type: {results['most_common_expression_text_type'].mode()[0]}")
+
+    # close
+    print(line)
 
     ##################################################
 
