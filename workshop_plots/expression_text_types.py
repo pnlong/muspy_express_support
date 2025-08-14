@@ -12,9 +12,10 @@ import multiprocessing
 import tqdm
 import argparse
 from os.path import exists
+from os import mkdir
 import pickle
 from typing import List
-from collections import Counter
+from re import sub
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -93,6 +94,23 @@ def get_x_label(duration_column_to_use: str) -> str:
     else:
         raise ValueError(f"Invalid duration column to use: {duration_column_to_use}")
 
+# function to split camel case into separate words
+def split_camel_case(text: str) -> str:
+    """
+    Split a camel case string into separate words.
+
+    Parameters
+    ----------
+    text : str
+        String to split
+
+    Returns
+    -------
+    str
+        String with camel case split into separate words
+    """
+    return sub(pattern = r"([a-z])([A-Z])", repl = r"\1 \2", string = text) # find instances where a lowercase letter is followed by an uppercase letter and insert a space after the lowercase letter
+
 ##################################################
 
 
@@ -156,12 +174,30 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
     Parameters
     ----------
     data : pd.DataFrame
-        Dataframe with expression text types
+        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", DURATION_COLUMN_TO_USE]
     output_filepath : str
         Path to output file
     """
     
-    #
+    # create the horizontal boxplot
+    plt.figure(figsize = (10, 8))
+    sns.boxplot(data = data, x = DURATION_COLUMN_TO_USE, y = "expression_text_type", orient = "h")
+    
+    # format the y-axis labels after plotting
+    ax = plt.gca()
+    y_labels = [split_camel_case(label.get_text()) for label in ax.get_yticklabels()]
+    ax.set_yticklabels(labels = y_labels)
+    
+    # set labels
+    plt.xlabel(get_x_label(duration_column_to_use = DURATION_COLUMN_TO_USE))
+    plt.ylabel("Expression Text Type")
+    
+    # adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # save the plot
+    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
+    plt.close()
     
 
 ##################################################
@@ -273,17 +309,47 @@ if __name__ == "__main__":
     # EXTRACT DATA WITH MULTIPROCESSING
     ##################################################
 
-    # use multiprocessing
-    print("Extracting expression text types...")
-    with multiprocessing.Pool(processes = args.jobs) as pool:
-        _ = list(tqdm(iterable = pool.imap_unordered(
-            func = extract_expression_text_types_helper,
-            iterable = indices_to_complete,
-            chunksize = 1
-        ),
-        desc = "Extracting Expression Text Types",
-        total = len(indices_to_complete)))
-    print("Extracted expression text types.")
+    # extract expression text types if necessary
+    if len(indices_to_complete) > 0:
+
+        # use multiprocessing
+        print("Extracting expression text types...")
+        with multiprocessing.Pool(processes = args.jobs) as pool:
+            _ = list(tqdm(iterable = pool.imap_unordered(
+                func = extract_expression_text_types_helper,
+                iterable = indices_to_complete,
+                chunksize = 1
+            ),
+            desc = "Extracting Expression Text Types",
+            total = len(indices_to_complete)))
+        print("Extracted expression text types.")
+
+    # expression text types already extracted
+    else:
+
+        print("Expression text types already extracted.")
+
+    # free up memory
+    del dataset, indices_to_complete, extract_expression_text_types_helper
+
+    ##################################################
+
+
+    # LOAD IN DATA, MAKE PLOTS
+    ##################################################
+
+    # create plots directory
+    plots_dir = f"{args.output_dir}/plots"
+    if not exists(plots_dir):
+        mkdir(plots_dir)
+
+    # read in data
+    results = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
+
+    # make duration boxplot
+    print("Making expression text type durations boxplot...")
+    plot_expression_text_types_boxplot(data = results, output_filepath = f"{plots_dir}/expression_text_type_durations.pdf")
+    print("Completed making expression text type durations boxplot.")
 
     ##################################################
 
