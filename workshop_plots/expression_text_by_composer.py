@@ -201,11 +201,11 @@ if __name__ == "__main__":
             song_output = pickle.load(file = pickle_file)
 
         # summarize
-        summary = summarize(song_output = song_output)
-        summary["path"] = path_expression
+        result = summarize(song_output = song_output)
+        result["path"] = path_expression
 
         # write to csv
-        pd.DataFrame(data = [summary], columns = OUTPUT_COLUMN_NAMES).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
+        pd.DataFrame(data = [result], columns = OUTPUT_COLUMN_NAMES).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
 
         # return nothing
         return
