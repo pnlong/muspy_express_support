@@ -69,27 +69,28 @@ def summarize(song_output: List[dict]) -> dict:
     # get number of expression text
     n_expression_text_per_track = [len(track_expression_text) for track_expression_text in expression_text]
     n_expression_text = sum(n_expression_text_per_track)
-    n_tracks_with_expression_text = sum([n_expression_text > 0 for track_n_expression_text in n_expression_text_per_track])
+    n_tracks_with_expression_text = sum([track_n_expression_text > 0 for track_n_expression_text in n_expression_text_per_track])
 
     # get number of lyrics
     n_lyrics = sum([len(track_lyrics) for track_lyrics in lyrics])
 
     # mean expression text density, number of expression text divided by length of track
-    mean_expression_text_density = sum([track_n_expression_text / track_output["track_length"]["seconds"] for track_output, track_n_expression_text in zip(song_output, n_expression_text_per_track)]) / n_tracks # number of expression text divided by length of track
+    mean_expression_text_density = sum([(track_n_expression_text / track_output["track_length"]["seconds"]) if track_output["track_length"]["seconds"] > 0 else 0.0 for track_output, track_n_expression_text in zip(song_output, n_expression_text_per_track)]) / n_tracks # number of expression text divided by length of track
     
     # mean expression text sparsity, seconds between each expression text
     mean_expression_text_sparsity = [0] * n_tracks
     for i in range(n_tracks):
         track_expression_text = expression_text[i]
         track_expression_text = track_expression_text.sort_values(by = "time.s")
-        mean_expression_text_sparsity[i] = track_expression_text["time.s"].diff(axis = 0, periods = 1).iloc[1:].mean() if len(track_expression_text) > 1 else 0.0
+        mean_expression_text_sparsity[i] = track_expression_text["time.s"].diff(periods = 1).iloc[1:].mean() if len(track_expression_text) > 1 else 0.0
     mean_expression_text_sparsity = sum(mean_expression_text_sparsity) / n_tracks
 
     # mean expression text duration, mean of mean expression text durations per track
     mean_expression_text_duration = sum([track_expression_text["duration.s"].mean() for track_expression_text in expression_text]) / n_tracks # mean of mean expression text durations per track
 
     # most common expression text type
-    most_common_expression_text_type = Counter(sum([track_expression_text["type"].tolist() for track_expression_text in expression_text], [])).most_common(1)[0][0]
+    most_common_expression_text_type = Counter(sum([track_expression_text["type"].tolist() for track_expression_text in expression_text], [])).most_common(1)
+    most_common_expression_text_type = most_common_expression_text_type[0][0] if len(most_common_expression_text_type) > 0 else None
 
     # return dictionary
     return {

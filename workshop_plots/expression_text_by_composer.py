@@ -33,7 +33,7 @@ from expression_text_by_type import SNS_THEME_KWARGS, LARGE_PLOTS_DPI
 
 # composers
 FULL_COMPOSERS = {composer: composer for composer in [
-    "Bach", "Beethoven", "Mozart", "Schubert", "Chopin", "Liszt", "Tchaikovsky", "Vivaldi", "Haydn"
+    "Vivaldi", "Bach", "Mozart", "Haydn", "Beethoven", "Schubert", "Chopin", "Liszt", "Tchaikovsky",
 ]} # allows us to set full, more precise composer names as opposed to just last names
 COMPOSERS = list(FULL_COMPOSERS.keys())
 
@@ -223,13 +223,13 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     """
     
     # create the horizontal boxplot
-    plt.figure(figsize = (10, 8))
+    plt.figure(figsize = (5, 4))
 
     # wrangle data to get expression text counts per song
     data = data.groupby(by = ["id", "composer"]).size().reset_index(name = "count")
 
     # make boxplot
-    sns.boxplot(data = data, x = "id", y = "composer", orient = "h", order = COMPOSERS)
+    sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = COMPOSERS, showfliers = False)
     
     # format the y-axis labels after plotting
     ax = plt.gca()
@@ -237,7 +237,7 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     ax.set_yticklabels(labels = y_labels)
     
     # set labels
-    plt.xlabel("Expression Text Count")
+    plt.xlabel("Expression Text Count Per Song")
     plt.ylabel("Composer")
     
     # adjust layout to prevent label cutoff
@@ -304,6 +304,7 @@ if __name__ == "__main__":
     # determine what composers exist in dataset
     print("Determining composers in dataset...")
     composers_dataset = pd.read_csv(filepath_or_buffer = args.input_filepath, sep = ",", header = 0, index_col = False, usecols = ["path_expression", "composer_name"])
+    composers_dataset = composers_dataset[~pd.isna(composers_dataset["composer_name"])]
     composers_dataset["id"] = list(map(get_id_from_path, composers_dataset["path_expression"])) # get id from path_expression
     composers_dataset["composer"] = list(map(get_composer_from_text, composers_dataset["composer_name"])) # get composer from text
     composers_dataset = composers_dataset[["id", "composer"]] # filter down to just relevant columns

@@ -249,10 +249,10 @@ if __name__ == "__main__":
     # averages
     print(line)
     results_expression_text_counts = results_expression_text[["id", "track_idx"]].groupby(by = ["id", "track_idx"]).size().reset_index(name = "count")
-    print(f"Average number of expression text per song: {results_expression_text_counts[['id', 'count']].groupby(by = 'id').sum().mean():.2f}")
+    print(f"Average number of expression text per song: {results_expression_text_counts[['id', 'count']].groupby(by = 'id').sum()['count'].mean():.2f}")
     print(f"Average number of expression text per track: {results_expression_text_counts['count'].mean():.2f}")
     results_lyrics_counts = results_lyrics[["id", "track_idx"]].groupby(by = ["id", "track_idx"]).size().reset_index(name = "count")
-    print(f"Average number of lyrics per song: {results_lyrics_counts[['id', 'count']].groupby(by = 'id').sum().mean():.2f}")
+    print(f"Average number of lyrics per song: {results_lyrics_counts[['id', 'count']].groupby(by = 'id').sum()['count'].mean():.2f}")
     print(f"Average number of lyrics per track: {results_lyrics_counts['count'].mean():.2f}")
     
     # mode
