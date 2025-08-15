@@ -8,7 +8,7 @@
 ##################################################
 
 import pandas as pd
-import multiprocessing
+from multiprocessing import cpu_count
 import argparse
 from os.path import exists
 from os import mkdir
@@ -169,9 +169,6 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
 
 if __name__ == "__main__":
 
-    # SETUP
-    ##################################################
-
     # parse arguments
     def parse_args(args = None, namespace = None):
         """
@@ -198,7 +195,7 @@ if __name__ == "__main__":
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
         parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to input file.")
         parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
-        parser.add_argument("--jobs", type = int, default = int(multiprocessing.cpu_count() / 4), help = "Number of jobs to run in parallel.")
+        parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
         if not exists(args.output_dir):
@@ -226,7 +223,5 @@ if __name__ == "__main__":
     print("Making expression text type durations boxplot...")
     plot_expression_text_types_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
     print("Completed making expression text type durations boxplot.")
-
-    ##################################################
 
 ##################################################
