@@ -219,7 +219,7 @@ if __name__ == "__main__":
 
     # make duration boxplot
     print("Making expression text type durations boxplot...")
-    plot_expression_text_types_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
+    plot_expression_text_types_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
     print("Completed making expression text type durations boxplot.")
 
 ##################################################
