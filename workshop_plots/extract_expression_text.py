@@ -40,6 +40,7 @@ OUTPUT_DIR = "/deepfreeze/pnlong/muspy_express"
 # extra constants
 DATASET_NAME = "expression_pickles"
 NA_VALUE = "NA"
+TIMEOUT = 10 * 60 # number of seconds for timeout
 
 # issues column names
 ISSUES_COLUMNS = ["path", "issue"]
@@ -702,6 +703,7 @@ def extract(music: muspy_express.Music) -> List[dict]:
         # add this track to the song output (no threshold check)
         song_output.append(track_output)
 
+    # return song output, ensuring it is non-empty
     return song_output
 
 ##################################################
@@ -883,7 +885,7 @@ if __name__ == "__main__":
         
         # read MXL file
         try:
-            music_mxl = muspy_express.read_musicxml(path_mxl)
+            music_mxl = muspy_express.read_musicxml(path_mxl, timeout = TIMEOUT)
         except Exception as e:
             issue_row = pd.DataFrame({"path": [path_mxl], "issue": [clean_issue_text(text = str(e))]})
             issue_row.to_csv(path_or_buf = mxl_issues_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
@@ -892,7 +894,7 @@ if __name__ == "__main__":
         # read MSCZ file if available
         if not pd.isna(path_mscz):
             try:
-                music_mscz = muspy_express.read_musescore(path_mscz)
+                music_mscz = muspy_express.read_musescore(path_mscz, timeout = TIMEOUT)
             except Exception as e:
                 issue_row = pd.DataFrame({"path": [path_mscz], "issue": [clean_issue_text(text = str(e))]})
                 issue_row.to_csv(path_or_buf = mscz_issues_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
@@ -908,6 +910,10 @@ if __name__ == "__main__":
 
         # use the core extract function
         song_output = extract(music = music)
+
+        # if song output is empty, skip this entry
+        if len(song_output) == 0:
+            return
         
         # add file paths to each track dictionary
         for track_output in song_output:

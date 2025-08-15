@@ -193,15 +193,15 @@ if __name__ == "__main__":
         """
         parser = argparse.ArgumentParser(prog = "Summarize Expression Text Statistics", description = "Summarize expression text statistics.") # create argument parser
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
-        parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to input file.")
+        parser.add_argument("--expression_text_types_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to expression text types file.")
         parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
         parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
         if not exists(args.output_dir):
             raise FileNotFoundError(f"Output directory not found: {args.output_dir}")
-        elif not exists(args.input_filepath):
-            raise FileNotFoundError(f"Input file not found: {args.input_filepath}")
+        elif not exists(args.expression_text_types_filepath):
+            raise FileNotFoundError(f"Input file not found: {args.expression_text_types_filepath}")
         return args # return parsed arguments
     args = parse_args()
 
@@ -212,12 +212,10 @@ if __name__ == "__main__":
 
     # read in input csv
     print("Reading in input data...")
-    dataset = pd.read_csv(filepath_or_buffer = args.input_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
-    print("Completed reading in input data.")
-
-    # filter out lyrics if not included
-    if not args.include_lyrics:
+    dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
+    if not args.include_lyrics: # filter out lyrics if not included
         dataset = dataset[dataset["expression_text_type"] != "Lyric"]
+    print("Completed reading in input data.")
 
     # make duration boxplot
     print("Making expression text type durations boxplot...")

@@ -282,6 +282,7 @@ if __name__ == "__main__":
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
         parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{DATASET_NAME}.csv", help = "Path to input file.")
         parser.add_argument("--expression_text_types_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to expression text types file.")
+        parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
         parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
@@ -322,17 +323,20 @@ if __name__ == "__main__":
 
     # read in input csv
     print("Reading in input data...")
-    dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
+    dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["id", "expression_text_type"])
+    if not args.include_lyrics: # filter out lyrics if not included
+        dataset = dataset[dataset["expression_text_type"] != "Lyric"]
     print("Completed reading in input data.")
 
     # wrangle input data
-    print("Wrangling input data...")
+    print("Filtering down to just the relevant composers...")
     dataset = composers_dataset.merge(right = dataset, how = "left", on = "id") # only include ids that are in composers_dataset
-    print("Completed wrangling input data.")
+    dataset = dataset[["id", "composer", "expression_text_type"]] # filter down to just relevant columns
+    print("Completed filtering down to just the relevant composers.")
 
     # make duration boxplot
     print("Making expression text by composer boxplot...")
-    plot_expression_text_by_composer_boxplot(data = dataset[["id", "composer", "expression_text_type"]], output_filepath = f"{plots_dir}/expression_text_by_composer.pdf")
+    plot_expression_text_by_composer_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_composer" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
     print("Completed making expression text by composer boxplot.")
 
     # output statistics on song count by composer
@@ -344,6 +348,7 @@ if __name__ == "__main__":
     for composer, count in zip(composer_counts["composer"], composer_counts["count"]):
         print(f"  - {composer}: {count}")
     print(f"Total number of songs: {composer_counts['count'].sum()}")
+    del composer_counts # free up memory
 
     # output statistics on favorite expression text type by composer
     print(line)
@@ -354,6 +359,7 @@ if __name__ == "__main__":
             print(f"  - {composer}: {', '.join(mode)}")
         else:
             print(f"  - {composer}: {mode}")
+    del favorite_expression_text_types # free up memory
 
     # close
     print(line)

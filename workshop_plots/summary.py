@@ -9,7 +9,7 @@
 
 import pandas as pd
 import multiprocessing
-import tqdm
+from tqdm import tqdm
 import argparse
 from os.path import exists
 import pickle

@@ -9,11 +9,12 @@
 
 import pandas as pd
 import multiprocessing
-import tqdm
+from tqdm import tqdm
 import argparse
 from os.path import exists
 import pickle
 from typing import List
+import warnings
 
 from os.path import dirname, realpath
 import sys
@@ -62,6 +63,8 @@ def extract_expression_text_types(song_output: List[dict]) -> dict:
     
     # initialize output dictionary
     output = {column: [] for column in OUTPUT_COLUMN_NAMES}
+    if len(song_output) == 0: # ensure song output is non-empty
+        raise RuntimeError("Song output is empty.")
     resolution = song_output[0]["resolution"]
 
     # go through each track
