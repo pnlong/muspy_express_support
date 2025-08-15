@@ -33,10 +33,10 @@ from expression_text_by_type import SNS_THEME_KWARGS, LARGE_PLOTS_DPI
 
 # composers
 FULL_COMPOSERS = {composer: composer for composer in [
-    "Vivaldi", "Bach", "Mozart", "Haydn", "Beethoven", "Schubert", "Chopin", "Liszt", "Tchaikovsky",
+    "Vivaldi", "Bach", "Mozart", "Haydn", "Beethoven", "Schubert", "Chopin", "Liszt", "Tchaikovsky", "Brahms", "Debussy", # ordered by death date
 ]} # allows us to set full, more precise composer names as opposed to just last names
 COMPOSERS = list(FULL_COMPOSERS.keys())
-
+SORT_COMPOSERS_BY_DEATH_DATE = False # whether to sort composers by death date
 
 # seaborn theme
 sns.set_theme(**SNS_THEME_KWARGS)
@@ -228,8 +228,14 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     # wrangle data to get expression text counts per song
     data = data.groupby(by = ["id", "composer"]).size().reset_index(name = "count")
 
+    # get ordering
+    if SORT_COMPOSERS_BY_DEATH_DATE:
+        sorted_composers = COMPOSERS
+    else: # get order by median count (descending)
+        sorted_composers = data.groupby(by = "composer").median().sort_values(by = "count", ascending = False).index.tolist()
+
     # make boxplot
-    sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = COMPOSERS, showfliers = False)
+    sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = sorted_composers, showfliers = False)
     
     # format the y-axis labels after plotting
     ax = plt.gca()

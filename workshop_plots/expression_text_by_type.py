@@ -138,8 +138,8 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
     # create the horizontal boxplot
     plt.figure(figsize = (5, 4))
 
-    # get order by mean duration (ascending)
-    sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = DURATION_COLUMN_TO_USE, ascending = True).index.tolist()
+    # get order by median duration (descending)
+    sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = DURATION_COLUMN_TO_USE, ascending = False).index.tolist()
 
     # make boxplot
     sns.boxplot(data = data, x = DURATION_COLUMN_TO_USE, y = "expression_text_type", orient = "h", order = sorted_types, showfliers = False)

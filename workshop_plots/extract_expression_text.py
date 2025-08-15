@@ -40,7 +40,8 @@ OUTPUT_DIR = "/deepfreeze/pnlong/muspy_express"
 # extra constants
 DATASET_NAME = "expression_pickles"
 NA_VALUE = "NA"
-TIMEOUT = 10 * 60 # number of seconds for timeout
+TIMEOUT_MINUTES = 20 # number of minutes for timeout
+USE_MSCZ = True # whether to use MSCZ files or MXL files
 
 # issues column names
 ISSUES_COLUMNS = ["path", "issue"]
@@ -885,7 +886,7 @@ if __name__ == "__main__":
         
         # read MXL file
         try:
-            music_mxl = muspy_express.read_musicxml(path_mxl, timeout = TIMEOUT)
+            music_mxl = muspy_express.read_musicxml(path_mxl, timeout = TIMEOUT_MINUTES * 60)
         except Exception as e:
             issue_row = pd.DataFrame({"path": [path_mxl], "issue": [clean_issue_text(text = str(e))]})
             issue_row.to_csv(path_or_buf = mxl_issues_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
@@ -894,14 +895,17 @@ if __name__ == "__main__":
         # read MSCZ file if available
         if not pd.isna(path_mscz):
             try:
-                music_mscz = muspy_express.read_musescore(path_mscz, timeout = TIMEOUT)
+                music_mscz = muspy_express.read_musescore(path_mscz, timeout = TIMEOUT_MINUTES * 60)
             except Exception as e:
                 issue_row = pd.DataFrame({"path": [path_mscz], "issue": [clean_issue_text(text = str(e))]})
                 issue_row.to_csv(path_or_buf = mscz_issues_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
                 print(f"Error reading MSCZ {basename(path_mscz)}: {e}")
         
         # determine which music object to use (prefer MSCZ, fallback to MXL)
-        music = music_mxl if music_mxl is not None else music_mscz
+        if USE_MSCZ:
+            music = music_mscz if music_mscz is not None else music_mxl
+        else:
+            music = music_mxl if music_mxl is not None else music_mscz
         
         # if both files failed to read, skip this entry
         if music is None:
@@ -910,9 +914,7 @@ if __name__ == "__main__":
 
         # use the core extract function
         song_output = extract(music = music)
-
-        # if song output is empty, skip this entry
-        if len(song_output) == 0:
+        if (len(song_output) == 0) or (sum((len(track_output["expression_text"]) for track_output in song_output)) == 0): # if song output is empty or has no expression text, skip this entry
             return
         
         # add file paths to each track dictionary
