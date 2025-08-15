@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # read in input csv
     print("Reading in input data...")
     dataset = pd.read_csv(filepath_or_buffer = args.input_filepath, sep = ",", header = 0, index_col = False)
-    print("Completed reading in input data.")
+    print(f"Completed reading in input data, {len(dataset)} songs in dataset.")
 
     # write column names
     output_filepath = f"{args.output_dir}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv"
