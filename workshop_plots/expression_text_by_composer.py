@@ -232,7 +232,7 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     if SORT_COMPOSERS_BY_DEATH_DATE:
         sorted_composers = COMPOSERS
     else: # get order by median count (descending)
-        sorted_composers = data.groupby(by = "composer").median().sort_values(by = "count", ascending = False).index.tolist()
+        sorted_composers = data[["composer", "count"]].groupby(by = "composer").median().sort_values(by = "count", ascending = False).index.tolist()
 
     # make boxplot
     sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = sorted_composers, showfliers = False)
