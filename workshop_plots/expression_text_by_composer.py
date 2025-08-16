@@ -223,7 +223,7 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     """
     
     # create the horizontal boxplot
-    plt.figure(figsize = (5, 4))
+    plt.figure(figsize = (6, 4))
 
     # wrangle data to get expression text counts per song
     data = data.groupby(by = ["id", "composer"]).size().reset_index(name = "count")

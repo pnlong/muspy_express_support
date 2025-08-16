@@ -136,7 +136,7 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
     """
     
     # create the horizontal boxplot
-    plt.figure(figsize = (5, 4))
+    plt.figure(figsize = (6, 4))
 
     # get order by median duration (descending)
     sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = DURATION_COLUMN_TO_USE, ascending = False).index.tolist()
