@@ -49,6 +49,9 @@ ISSUES_COLUMNS = ["path", "issue"]
 # constants copied from parse_mscz.py for expression extraction
 EXPRESSION_TEXT_COLUMNS = ["time", "duration", "time.s", "duration.s", "type", "value"]
 
+# articulation constants
+DEFAULT_MAXIMUM_GAP = 960  # 2 quarter notes assuming 480 resolution
+
 # dynamic constants
 DYNAMIC_VELOCITY_MAP = {
     "pppppp": 4, "ppppp": 8, "pppp": 12, "ppp": 16, "pp": 33, "p": 49, "mp": 64,
@@ -360,8 +363,10 @@ def scrape_barlines(barlines, song_length: int, use_implied_duration: bool = Tru
         barlines_encoded["time"][i] = barline.time
         barlines_encoded["time.s"][i] = 0  # placeholder, will be calculated later
         
-        # duration calculation - implied duration to next barline or song end
-        if use_implied_duration:
+        # duration calculation - check for explicit duration first, then implied duration to next barline or song end
+        if hasattr(barline, "duration") and barline.duration is not None:
+            duration = barline.duration
+        elif use_implied_duration:
             if i + 1 < len(filtered_barlines):
                 duration = filtered_barlines[i + 1].time - barline.time
             else:
@@ -411,8 +416,10 @@ def scrape_time_signatures(time_signatures, song_length: int, use_implied_durati
         time_signatures_encoded["time"][i] = time_signature.time
         time_signatures_encoded["time.s"][i] = 0  # placeholder, will be calculated later
         
-        # duration calculation - implied duration to next time signature change or song end
-        if use_implied_duration:
+        # duration calculation - check for explicit duration first, then implied duration to next time signature change or song end
+        if hasattr(time_signature, "duration") and time_signature.duration is not None:
+            duration = time_signature.duration
+        elif use_implied_duration:
             if i + 1 < len(changes):
                 duration = changes[i + 1].time - time_signature.time
             else:
@@ -471,8 +478,10 @@ def scrape_key_signatures(key_signatures, song_length: int, use_implied_duration
         key_signatures_encoded["time"][i] = key_signature.time
         key_signatures_encoded["time.s"][i] = 0  # placeholder, will be calculated later
         
-        # duration calculation - implied duration to next key signature change or song end
-        if use_implied_duration:
+        # duration calculation - check for explicit duration first, then implied duration to next key signature change or song end
+        if hasattr(key_signature, "duration") and key_signature.duration is not None:
+            duration = key_signature.duration
+        elif use_implied_duration:
             if i + 1 < len(changes):
                 duration = changes[i + 1].time - key_signature.time
             else:
@@ -533,8 +542,10 @@ def scrape_tempos(tempos, song_length: int, use_implied_duration: bool = True) -
         tempos_encoded["time"][i] = tempo.time
         tempos_encoded["time.s"][i] = 0  # placeholder, will be calculated later
         
-        # duration calculation - implied duration to next tempo or song end
-        if use_implied_duration:
+        # duration calculation - check for explicit duration first, then implied duration to next tempo or song end
+        if hasattr(tempo, "duration") and tempo.duration is not None:
+            duration = tempo.duration
+        elif use_implied_duration:
             if i + 1 < len(tempos):
                 duration = tempos[i + 1].time - tempo.time
             else:
@@ -549,6 +560,199 @@ def scrape_tempos(tempos, song_length: int, use_implied_duration: bool = True) -
         tempos_encoded["value"][i] = check_text(text = qpm_tempo_mapper(qpm = qpm))
     
     return pd.DataFrame(data = tempos_encoded, columns = output_columns)
+
+# scrape articulations
+def scrape_articulations(annotations, song_length: int, maximum_gap: int = DEFAULT_MAXIMUM_GAP, articulation_count_threshold: int = 4, use_implied_duration: bool = True) -> pd.DataFrame:
+    """
+    Extract articulation chunks from annotations with implied duration calculation.
+    
+    Groups articulations by type and identifies chunks of similar articulations,
+    filtering out chunks that don't meet the minimum count threshold.
+    
+    Parameters
+    ----------
+    annotations : list
+        List of annotation objects containing articulation data
+    song_length : int
+        Total length of the song in time steps, used as end boundary for duration calculation
+    maximum_gap : int, optional
+        Maximum distance (in time steps) between articulations before ending current chunk.
+        Defaults to DEFAULT_MAXIMUM_GAP (2 quarter notes assuming 480 resolution)
+    articulation_count_threshold : int, optional
+        Minimum number of articulations in a chunk to make it worthwhile recording, by default 4
+    use_implied_duration : bool, optional
+        Whether to calculate implied durations for articulation chunks, by default True
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns defined by EXPRESSION_TEXT_COLUMNS containing articulation chunk data
+    """
+    output_columns = EXPRESSION_TEXT_COLUMNS
+    articulations_encoded = {key: [] for key in output_columns}
+    encounters = {}
+    
+    def check_all_subtypes_for_chunk_ending(time):
+        """Helper function to check if articulation subtypes chunk ended"""
+        for articulation_subtype in tuple(encounters.keys()):
+            if (time - encounters[articulation_subtype]["end"]) > maximum_gap:
+                if encounters[articulation_subtype]["count"] >= articulation_count_threshold:
+                    value = clean_up_text(text = articulation_subtype) if articulation_subtype else "articulation"
+                    # Skip certain articulations and normalize values
+                    if any((keyword in value for keyword in ("lutefingering", "lute-fingering"))):
+                        continue
+                    elif "prall" in value:
+                        value = "trill"
+                    elif value.startswith("u") or value.startswith("d"):
+                        value = value[1:]
+                    
+                    articulations_encoded["time"].append(encounters[articulation_subtype]["start"])
+                    articulations_encoded["time.s"].append(0)  # placeholder, will be calculated later
+                    # Articulations use chunk duration (start to end of chunk), not implied duration to song end
+                    duration = encounters[articulation_subtype]["end"] - encounters[articulation_subtype]["start"]
+                    articulations_encoded["duration"].append(duration)
+                    articulations_encoded["duration.s"].append(0)  # placeholder, will be calculated later
+                    articulations_encoded["type"].append("Articulation")
+                    articulations_encoded["value"].append(value)
+                del encounters[articulation_subtype]
+    
+    for annotation in annotations:
+        check_all_subtypes_for_chunk_ending(time = annotation.time)
+        if hasattr(annotation, "annotation") and annotation.annotation.__class__.__name__ == "Articulation":
+            articulation_subtype = annotation.annotation.subtype if hasattr(annotation.annotation, "subtype") else None
+            if articulation_subtype in encounters.keys():
+                encounters[articulation_subtype]["end"] = annotation.time
+                encounters[articulation_subtype]["count"] += 1
+            else:
+                encounters[articulation_subtype] = {"start": annotation.time, "end": annotation.time, "count": 1}
+    
+    # Final check using last annotation time + gap, not song_length
+    if len(annotations) > 0:
+        check_all_subtypes_for_chunk_ending(time = annotations[-1].time + (2 * maximum_gap))
+    
+    return pd.DataFrame(data = articulations_encoded, columns = output_columns)
+
+# scrape slurs
+def scrape_slurs(annotations, song_length: int, minimum_duration: float = 1.5, music: muspy_express.Music = None, use_implied_duration: bool = True) -> pd.DataFrame:
+    """
+    Extract slur spanners with minimum duration filtering.
+    
+    Processes SlurSpanner annotations and filters out slurs that are too short,
+    focusing on musically significant slurs rather than ties.
+    
+    Parameters
+    ----------
+    annotations : list
+        List of annotation objects containing slur data
+    song_length : int
+        Total length of the song in time steps, used as end boundary for duration calculation
+    minimum_duration : float, optional
+        Minimum duration (in seconds) a slur needs to be to make it worthwhile recording, by default 1.5
+    music : muspy_express.Music, optional
+        Music object for time conversion, by default None
+    use_implied_duration : bool, optional
+        Whether to use the annotation's duration attribute, by default True
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns defined by EXPRESSION_TEXT_COLUMNS containing slur data
+    """
+    output_columns = EXPRESSION_TEXT_COLUMNS
+    slurs_encoded = {key: [] for key in output_columns}
+    
+    for annotation in annotations:
+        if (hasattr(annotation, "annotation") and 
+            annotation.annotation.__class__.__name__ == "SlurSpanner" and
+            hasattr(annotation.annotation, "is_slur") and
+            annotation.annotation.is_slur):
+            
+            # Calculate duration - use annotation's own duration, only use implied duration if unavailable
+            if hasattr(annotation.annotation, "duration") and annotation.annotation.duration is not None:
+                duration = annotation.annotation.duration
+            elif use_implied_duration:
+                duration = song_length - annotation.time  # implied duration only when annotation duration is unavailable
+            else:
+                duration = 0
+            
+            # Calculate duration in seconds for filtering
+            if music and hasattr(music, "get_real_time"):
+                start_seconds = music.get_real_time(annotation.time)
+                duration_seconds = music.get_real_time(annotation.time + duration) - start_seconds if duration > 0 else 0
+            else:
+                # Fallback: estimate based on time steps (assume ~120 BPM, 480 resolution)
+                start_seconds = annotation.time * 0.5 / 480
+                duration_seconds = duration * 0.5 / 480 if duration > 0 else 0
+            
+            if duration_seconds > minimum_duration:
+                slurs_encoded["time"].append(annotation.time)
+                slurs_encoded["time.s"].append(0)  # placeholder, will be calculated later
+                slurs_encoded["duration"].append(duration)
+                slurs_encoded["duration.s"].append(0)  # placeholder, will be calculated later
+                slurs_encoded["type"].append("SlurSpanner")
+                slurs_encoded["value"].append("slur")
+    
+    return pd.DataFrame(data = slurs_encoded, columns = output_columns)
+
+# scrape pedals
+def scrape_pedals(annotations, song_length: int, minimum_duration: float = 1.5, music: muspy_express.Music = None, use_implied_duration: bool = True) -> pd.DataFrame:
+    """
+    Extract pedal spanners with minimum duration filtering.
+    
+    Processes PedalSpanner annotations and filters out pedal markings that are too short,
+    focusing on musically significant pedal usage.
+    
+    Parameters
+    ----------
+    annotations : list
+        List of annotation objects containing pedal data
+    song_length : int
+        Total length of the song in time steps, used as end boundary for duration calculation
+    minimum_duration : float, optional
+        Minimum duration (in seconds) a pedal needs to be to make it worthwhile recording, by default 1.5
+    music : muspy_express.Music, optional
+        Music object for time conversion, by default None
+    use_implied_duration : bool, optional
+        Whether to use the annotation's duration attribute, by default True
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns defined by EXPRESSION_TEXT_COLUMNS containing pedal data
+    """
+    output_columns = EXPRESSION_TEXT_COLUMNS
+    pedals_encoded = {key: [] for key in output_columns}
+    
+    for annotation in annotations:
+        if (hasattr(annotation, "annotation") and 
+            annotation.annotation.__class__.__name__ == "PedalSpanner"):
+            
+            # Calculate duration - use annotation's own duration, only use implied duration if unavailable
+            if hasattr(annotation.annotation, "duration") and annotation.annotation.duration is not None:
+                duration = annotation.annotation.duration
+            elif use_implied_duration:
+                duration = song_length - annotation.time  # implied duration only when annotation duration is unavailable
+            else:
+                duration = 0
+            
+            # Calculate duration in seconds for filtering
+            if music and hasattr(music, "get_real_time"):
+                start_seconds = music.get_real_time(annotation.time)
+                duration_seconds = music.get_real_time(annotation.time + duration) - start_seconds if duration > 0 else 0
+            else:
+                # Fallback: estimate based on time steps (assume ~120 BPM, 480 resolution)
+                start_seconds = annotation.time * 0.5 / 480
+                duration_seconds = duration * 0.5 / 480 if duration > 0 else 0
+            
+            if duration_seconds > minimum_duration:
+                pedals_encoded["time"].append(annotation.time)
+                pedals_encoded["time.s"].append(0)  # placeholder, will be calculated later
+                pedals_encoded["duration"].append(duration)
+                pedals_encoded["duration.s"].append(0)  # placeholder, will be calculated later
+                pedals_encoded["type"].append("PedalSpanner")
+                pedals_encoded["value"].append("pedal")
+    
+    return pd.DataFrame(data = pedals_encoded, columns = output_columns)
 
 # scrape system-level expression text
 def scrape_system_expression_text(music: muspy_express.Music, song_length: int) -> pd.DataFrame:
@@ -578,14 +782,14 @@ def scrape_system_expression_text(music: muspy_express.Music, song_length: int) 
     
     system_level_expression_text = pd.concat(objs = (system_annotations, system_barlines, system_time_signatures, system_key_signatures, system_tempos), axis = 0, ignore_index = True)
     return system_level_expression_text
-
+    
 # scrape staff-level expression text
 def scrape_staff_expression_text(track: muspy_express.Track, music: muspy_express.Music, song_length: int) -> pd.DataFrame:
     """
     Extract staff-level expression text from a single track.
     
-    Processes track-specific annotations and other staff-level musical elements.
-    Can be extended to include articulations, slurs, pedal markings, etc.
+    Processes track-specific annotations, articulations, slurs, and pedal markings
+    from the track level into a comprehensive DataFrame of expression text.
     
     Parameters
     ----------
@@ -602,8 +806,11 @@ def scrape_staff_expression_text(track: muspy_express.Track, music: muspy_expres
         DataFrame containing staff-level expression text
     """
     staff_annotations = scrape_annotations(annotations = track.annotations, song_length = song_length) if hasattr(track, "annotations") else pd.DataFrame(columns = EXPRESSION_TEXT_COLUMNS)
-    # you could add more staff-level features here like articulations, slurs, pedals if needed
-    return staff_annotations
+    staff_articulations = scrape_articulations(annotations = track.annotations, song_length = song_length) if hasattr(track, "annotations") else pd.DataFrame(columns = EXPRESSION_TEXT_COLUMNS)
+    staff_slurs = scrape_slurs(annotations = track.annotations, song_length = song_length, minimum_duration = 1.5, music = music) if hasattr(track, "annotations") else pd.DataFrame(columns = EXPRESSION_TEXT_COLUMNS)
+    staff_pedals = scrape_pedals(annotations = track.annotations, song_length = song_length, minimum_duration = 1.5, music = music) if hasattr(track, "annotations") else pd.DataFrame(columns = EXPRESSION_TEXT_COLUMNS)
+    
+    return pd.concat(objs = (staff_annotations, staff_articulations, staff_slurs, staff_pedals), axis = 0, ignore_index = True)
 
 ##################################################
 
@@ -626,13 +833,12 @@ def extract(music: muspy_express.Music) -> List[dict]:
         list of track dictionaries containing expression text
     """
     
-    # get song length using muspy2 API
+    # get song length using muspy_express
     song_length = music.get_end_time()
     
     # extract system-level lyrics and expression text
     system_lyrics = scrape_lyrics(lyrics = music.lyrics)
     if len(system_lyrics) > 0:
-        # muspy2 uses get_real_time instead of metrical_time_to_absolute_time
         if hasattr(music, "get_real_time"):
             system_lyrics["time.s"] = system_lyrics["time"].apply(lambda time: music.get_real_time(time))
             system_lyrics["duration.s"] = system_lyrics["duration"].apply(lambda duration: music.get_real_time(duration) if duration > 0 else 0.0)
@@ -640,10 +846,8 @@ def extract(music: muspy_express.Music) -> List[dict]:
             system_lyrics["time.s"] = system_lyrics["time"] * 0.5  # fallback estimate
             system_lyrics["duration.s"] = system_lyrics["duration"] * 0.5  # fallback estimate
         system_lyrics = system_lyrics[EXPRESSION_TEXT_COLUMNS]
-    
     system_expression_text = scrape_system_expression_text(music = music, song_length = song_length)
     if len(system_expression_text) > 0:
-        # muspy2 uses get_real_time instead of metrical_time_to_absolute_time
         if hasattr(music, "get_real_time"):
             system_expression_text["time.s"] = system_expression_text["time"].apply(lambda time: music.get_real_time(time))
             system_expression_text["duration.s"] = system_expression_text["duration"].apply(lambda duration: music.get_real_time(duration) if duration > 0 else 0.0)
