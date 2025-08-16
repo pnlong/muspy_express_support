@@ -298,7 +298,6 @@ if __name__ == "__main__":
             raise FileNotFoundError(f"Input file not found: {args.input_filepath}")
         elif not exists(args.expression_text_types_filepath):
             raise FileNotFoundError(f"Input file not found: {args.expression_text_types_filepath}")
-
         return args # return parsed arguments
     args = parse_args()
 
