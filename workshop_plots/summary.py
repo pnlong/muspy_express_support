@@ -61,6 +61,7 @@ def summarize(song_output: List[dict]) -> dict:
 
     # get number of tracks
     n_tracks = len(song_output)
+    resolution = song_output[0]["resolution"]
 
     # split expression text and lyrics
     expression_text = [track_output["expression_text"][track_output["expression_text"]["type"] != "Lyric"] for track_output in song_output]
@@ -74,15 +75,15 @@ def summarize(song_output: List[dict]) -> dict:
     # get number of lyrics
     n_lyrics = sum([len(track_lyrics) for track_lyrics in lyrics])
 
-    # mean expression text density, number of expression text divided by length of track
+    # mean expression text density, number of expression text divided by length of track in seconds
     mean_expression_text_density = sum([(track_n_expression_text / track_output["track_length"]["seconds"]) if track_output["track_length"]["seconds"] > 0 else 0.0 for track_output, track_n_expression_text in zip(song_output, n_expression_text_per_track)]) / n_tracks # number of expression text divided by length of track
     
-    # mean expression text sparsity, seconds between each expression text
+    # mean expression text sparsity, beats between each expression text
     mean_expression_text_sparsity = [0] * n_tracks
     for i in range(n_tracks):
         track_expression_text = expression_text[i]
-        track_expression_text = track_expression_text.sort_values(by = "time.s")
-        mean_expression_text_sparsity[i] = track_expression_text["time.s"].diff(periods = 1).iloc[1:].mean() if len(track_expression_text) > 1 else 0.0
+        track_expression_text = track_expression_text.sort_values(by = "time")
+        mean_expression_text_sparsity[i] = track_expression_text["time"].diff(periods = 1).iloc[1:].mean() / resolution if len(track_expression_text) > 1 else 0.0
     mean_expression_text_sparsity = sum(mean_expression_text_sparsity) / n_tracks
 
     # mean expression text duration, mean of mean expression text durations per track

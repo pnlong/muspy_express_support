@@ -31,35 +31,10 @@ from extract_expression_text_types import EXPRESSION_TEXT_TYPE_DATASET_NAME
 
 # data constants
 DURATION_COLUMN_TO_USE = "duration_beats"
+DISTANCE_COLUMN_TO_USE = "distance_beats"
 
 # figure constants
 LARGE_PLOTS_DPI = 200
-ALL_TYPE_NAME = "AllTypes" # name of all features plot name
-
-# colors
-TEXT_GREEN = "#5e813f"
-TEMPORAL_PURPLE = "#68349a"
-SPANNER_BLUE = "#4f71be"
-DYNAMIC_GOLD = "#b89230"
-SYMBOL_ORANGE = "#ff624c"
-SYSTEM_SALMON = "#a91b0d"
-ALL_BROWN = "#964b00"
-EXPRESSION_TEXT_COLORS = {
-    ALL_TYPE_NAME: ALL_BROWN,
-    "Lyric": TEXT_GREEN,
-    "Tempo": TEMPORAL_PURPLE,
-    "Dynamic": DYNAMIC_GOLD,
-    "TimeSignature": SYSTEM_SALMON,
-    "Text": TEXT_GREEN,
-    "KeySignature": SYSTEM_SALMON,
-    "Barline": SYSTEM_SALMON,
-    "Articulation": SYMBOL_ORANGE,
-    "HairPin": DYNAMIC_GOLD,
-    "RehearsalMark": TEXT_GREEN,
-    "Slur": SPANNER_BLUE,
-    "Fermata": TEMPORAL_PURPLE,
-    "Pedal": SPANNER_BLUE,
-}
 
 # seaborn theme
 SNS_THEME_KWARGS = {
@@ -76,29 +51,29 @@ sns.set_theme(**SNS_THEME_KWARGS)
 # HELPER FUNCTIONS
 ##################################################
 
-# get the x label from the duration column in use
-def get_x_label(duration_column_to_use: str) -> str:
+# get the x label from the column in use
+def get_x_label(column_to_use: str) -> str:
     """
-    Get the x label from the duration column in use.
+    Get the x label from the column in use.
 
     Parameters
     ----------
-    duration_column_to_use : str
-        The duration column to use
+    column_to_use : str
+        The column to use
 
     Returns
     -------
     str
-        The x label from the duration column in use
+        The x label from the column in use
     """
-    if duration_column_to_use == "duration_time_steps":
+    if column_to_use.endswith("time_steps"):
         return "Time Steps"
-    elif duration_column_to_use == "duration_seconds":
+    elif column_to_use.endswith("seconds"):
         return "Seconds"
-    elif duration_column_to_use == "duration_beats":
+    elif column_to_use.endswith("beats"):
         return "Beats"
     else:
-        raise ValueError(f"Invalid duration column to use: {duration_column_to_use}")
+        raise ValueError(f"Invalid column to use: {column_to_use}")
 
 # function to split camel case into separate words
 def split_camel_case(text: str) -> str:
@@ -123,14 +98,16 @@ def split_camel_case(text: str) -> str:
 # PLOT EXPRESSION TEXT TYPES
 ##################################################
 
-def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str):
+def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, output_filepath: str):
     """
     Plot expression text types as a boxplot.
 
     Parameters
     ----------
     data : pd.DataFrame
-        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", DURATION_COLUMN_TO_USE]
+        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", column_to_use]
+    column_to_use : str
+        Column name to use (either distance or duration for some timing metric)
     output_filepath : str
         Path to output file
     """
@@ -139,10 +116,10 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
     plt.figure(figsize = (6, 4))
 
     # get order by median duration (descending)
-    sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = DURATION_COLUMN_TO_USE, ascending = False).index.tolist()
+    sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = column_to_use, ascending = False).index.tolist()
 
     # make boxplot
-    sns.boxplot(data = data, x = DURATION_COLUMN_TO_USE, y = "expression_text_type", orient = "h", order = sorted_types, showfliers = False)
+    sns.boxplot(data = data, x = column_to_use, y = "expression_text_type", orient = "h", order = sorted_types, showfliers = False)
     
     # format the y-axis labels after plotting
     ax = plt.gca()
@@ -150,7 +127,7 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, output_filepath: str)
     ax.set_yticklabels(labels = y_labels)
     
     # set labels
-    plt.xlabel(get_x_label(duration_column_to_use = DURATION_COLUMN_TO_USE))
+    plt.xlabel(get_x_label(column_to_use = column_to_use))
     plt.ylabel("Expression Text Type")
     
     # adjust layout to prevent label cutoff
@@ -212,14 +189,27 @@ if __name__ == "__main__":
 
     # read in input csv
     print("Reading in input data...")
-    dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", "duration_beats"])
+    dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["expression_text_type", DURATION_COLUMN_TO_USE, DISTANCE_COLUMN_TO_USE])
     if not args.include_lyrics: # filter out lyrics if not included
         dataset = dataset[dataset["expression_text_type"] != "Lyric"]
     print("Completed reading in input data.")
 
     # make duration boxplot
     print("Making expression text type durations boxplot...")
-    plot_expression_text_types_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
+    plot_expression_text_types_boxplot(
+        data = dataset,
+        column_to_use = DURATION_COLUMN_TO_USE,
+        output_filepath = f"{plots_dir}/expression_text_by_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf",
+    )
     print("Completed making expression text type durations boxplot.")
+
+    # make distance boxplot
+    print("Making expression text type relative density boxplot...")
+    plot_expression_text_types_boxplot(
+        data = dataset,
+        column_to_use = DISTANCE_COLUMN_TO_USE,
+        output_filepath = f"{plots_dir}/expression_text_by_type_relative_density" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf",
+    )
+    print("Completed making expression text type relative density boxplot.")
 
 ##################################################

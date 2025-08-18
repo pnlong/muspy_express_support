@@ -14,7 +14,7 @@ import argparse
 from os.path import exists
 import pickle
 from typing import List
-import warnings
+from collections import defaultdict
 
 from os.path import dirname, realpath
 import sys
@@ -29,7 +29,7 @@ from extract_expression_text import OUTPUT_DIR, DATASET_NAME, NA_VALUE, get_id_f
 ##################################################
 
 # data constants
-OUTPUT_COLUMN_NAMES = ["id", "track_idx", "expression_text_type", "expression_text_value", "duration_time_steps", "duration_seconds", "duration_beats"]
+OUTPUT_COLUMN_NAMES = ["id", "track_idx", "expression_text_type", "expression_text_value", "duration_time_steps", "duration_seconds", "duration_beats", "distance_time_steps", "distance_seconds", "distance_beats"]
 EXPRESSION_TEXT_TYPE_DATASET_NAME = "expression_text_type"
 
 ##################################################
@@ -38,7 +38,67 @@ EXPRESSION_TEXT_TYPE_DATASET_NAME = "expression_text_type"
 # HELPER FUNCTIONS
 ##################################################
 
+# get relative distances for relative density calculation, effectively implied duration
+def get_relative_distances(track_output: dict) -> tuple[List[int], List[float], List[float]]:
+    """
+    Get distances between expression text markings of the same type for relative density calculation. This is effectively implied duration.
 
+    Parameters
+    ----------
+    track_output : dict
+        Single track dictionary containing expression_text and track_length
+
+    Returns
+    -------
+    tuple[List[int], List[float], List[float]]
+        Tuple of time steps, seconds, and beats between successive expression text markings of the same type
+    """
+    
+    # get expression text and track info
+    expression_text = track_output["expression_text"]
+    track_length = track_output["track_length"]
+    resolution = track_output["resolution"]
+    
+    # if no expression text, return empty lists
+    if len(expression_text) == 0:
+        return [], [], []
+    
+    # initialize distance arrays in original order
+    num_markings = len(expression_text)
+    distance_time_steps = [0] * num_markings
+    distance_seconds = [0.0] * num_markings
+    distance_beats = [0.0] * num_markings
+    
+    # group by expression type and sort by time within each group
+    type_groups = defaultdict(list)
+    for idx in expression_text.index:
+        expr_type = expression_text.at[idx, "type"]
+        time = expression_text.at[idx, "time"]
+        type_groups[expr_type].append((time, idx))
+    
+    # process each expression type
+    for expr_type, time_idx_pairs in type_groups.items():
+        time_idx_pairs.sort(key = lambda x: x[0]) # sort by time to ensure correct ordering
+        indices = [idx for time, idx in time_idx_pairs]
+        for i, idx in enumerate(indices):
+            
+            # distance to next marking of same type in this track
+            if i < len(indices) - 1:
+                next_idx = indices[i + 1]
+                distance_time_steps[idx] = expression_text.at[next_idx, "time"] - expression_text.at[idx, "time"]
+                distance_seconds[idx] = expression_text.at[next_idx, "time.s"] - expression_text.at[idx, "time.s"]
+            
+            # distance to track end for last marking of this type in this track
+            else:
+                current_time = expression_text.at[idx, "time"]
+                current_time_s = expression_text.at[idx, "time.s"]
+                distance_time_steps[idx] = max(0, track_length["time_steps"] - current_time)
+                distance_seconds[idx] = max(0.0, track_length["seconds"] - current_time_s)
+            
+            # calculate beats from time steps
+            distance_beats[idx] = distance_time_steps[idx] / resolution
+    
+    return distance_time_steps, distance_seconds, distance_beats
 
 ##################################################
 
@@ -82,6 +142,12 @@ def extract_expression_text_types(song_output: List[dict]) -> dict:
         output["duration_time_steps"].extend(expression_text["duration"].tolist())
         output["duration_seconds"].extend(expression_text["duration.s"].tolist())
         output["duration_beats"].extend((expression_text["duration"] / resolution).tolist())
+
+        # calculate relative distances for this track
+        distance_time_steps, distance_seconds, distance_beats = get_relative_distances(track_output = track_output)
+        output["distance_time_steps"].extend(distance_time_steps)
+        output["distance_seconds"].extend(distance_seconds)
+        output["distance_beats"].extend(distance_beats)
 
         # free up memory
         del expression_text
