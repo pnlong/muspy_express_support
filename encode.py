@@ -320,8 +320,8 @@ def scrape_slurs(annotations: List[Annotation], minimum_duration: float, music: 
     for annotation in annotations:
         if annotation.annotation.__class__.__name__ == "SlurSpanner":
             if annotation.annotation.is_slur:
-                start = music.metrical_time_to_absolute_time(time_steps = annotation.time)
-                duration = music.metrical_time_to_absolute_time(time_steps = annotation.time + annotation.annotation.duration) - start
+                start = music.get_real_time(time = annotation.time)
+                duration = music.get_real_time(time = annotation.time + annotation.annotation.duration) - start
                 if duration > minimum_duration:
                     slurs_encoded["type"].append(representation.EXPRESSIVE_FEATURE_TYPE_STRING)
                     slurs_encoded["value"].append(check_text(text = "slur"))
@@ -345,8 +345,8 @@ def scrape_pedals(annotations: List[Annotation], minimum_duration: float, music:
     pedals_encoded = {key: [] for key in output_columns} # create dictionary of lists
     for annotation in annotations:
         if annotation.annotation.__class__.__name__ == "PedalSpanner":
-            start = music.metrical_time_to_absolute_time(time_steps = annotation.time)
-            duration = music.metrical_time_to_absolute_time(time_steps = annotation.time + annotation.annotation.duration) - start
+            start = music.get_real_time(time = annotation.time)
+            duration = music.get_real_time(time = annotation.time + annotation.annotation.duration) - start
             if duration > minimum_duration:
                 pedals_encoded["type"].append(representation.EXPRESSIVE_FEATURE_TYPE_STRING)
                 pedals_encoded["value"].append(check_text(text = "pedal"))
@@ -368,18 +368,20 @@ def scrape_pedals(annotations: List[Annotation], minimum_duration: float, music:
 
 def get_system_level_expressive_features(music: MusicExpress, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Wrapper function to make code more readable. Extracts system-level expressive features."""
-    system_annotations = scrape_annotations(annotations = music.annotations, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
-    system_barlines = scrape_barlines(barlines = music.barlines, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
-    system_time_signatures = scrape_time_signatures(time_signatures = music.time_signatures, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
-    system_key_signatures = scrape_key_signatures(key_signatures = music.key_signatures, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
-    system_tempos = scrape_tempos(tempos = music.tempos, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    song_length = music.get_end_time()
+    system_annotations = scrape_annotations(annotations = music.annotations, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    system_barlines = scrape_barlines(barlines = music.barlines, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    system_time_signatures = scrape_time_signatures(time_signatures = music.time_signatures, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    system_key_signatures = scrape_key_signatures(key_signatures = music.key_signatures, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    system_tempos = scrape_tempos(tempos = music.tempos, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
     system_level_expressive_features = pd.concat(objs = (system_annotations, system_barlines, system_time_signatures, system_key_signatures, system_tempos), axis = 0, ignore_index = True)
     return system_level_expressive_features
 
 def get_staff_level_expressive_features(track: Track, music: MusicExpress, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Wrapper function to make code more readable. Extracts staff-level expressive features."""
+    song_length = music.get_end_time()
     staff_notes = scrape_notes(notes = track.notes, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
-    staff_annotations = scrape_annotations(annotations = track.annotations, song_length = music.song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
+    staff_annotations = scrape_annotations(annotations = track.annotations, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
     staff_articulations = scrape_articulations(annotations = track.annotations, maximum_gap = 2 * music.resolution, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name) # 2 beats = 2 * music.resolution
     staff_slurs = scrape_slurs(annotations = track.annotations, minimum_duration = 1.5, music = music, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name) # minimum duration for slurs to be recorded is 1.5 seconds
     staff_pedals = scrape_pedals(annotations = track.annotations, minimum_duration = 1.5, music = music, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name) # minimum duration for pedals to be recorded is 1.5 seconds
@@ -431,7 +433,7 @@ def extract_data(
         data["velocity"] = data["velocity"].fillna(value = representation.NONE_VELOCITY)
 
         # convert time to seconds for certain types of sorting that might require it
-        absolute_time_helper = lambda time_steps: music.metrical_time_to_absolute_time(time_steps = time_steps)
+        absolute_time_helper = lambda time_steps: music.get_real_time(time = time_steps)
         data["time.s"] = data["time"].apply(absolute_time_helper) # get time in seconds
         # data = data.sort_values(by = "time").reset_index(drop = True) # sort by time
 

@@ -6,14 +6,14 @@
 
 # A place to store the command-line inputs for different evaluations.
 
-# sh /home/pnlong/model_musescore/evaluate.sh
+# sh /home/pnlong/muspy_express/evaluate.sh
 
 
 # CONSTANTS
 ##################################################
 
-software_dir="/home/pnlong/model_musescore"
-data_dir="/home/pnlong/musescore/datav"
+software_dir="/home/pnlong/muspy_express"
+data_dir="/deepfreeze/pnlong/muspy_express/experiments"
 gpu=3
 model="truth"
 
@@ -51,7 +51,7 @@ while getopts ':m:d:g:h' opt; do
   esac
 done
 
-trained_models="${data_dir}/models.txt"
+trained_models="${data_dir}/models/models.txt"
 paths_test="${data_dir}/test.txt"
 encoding="${data_dir}/encoding.json"
 output_dir="${data_dir}"
@@ -75,8 +75,8 @@ if [[ ${model} == "truth" ]]; then
 
 else
 
-    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
-    python ${software_dir}/evaluate.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
+    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/eval/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
+    python ${software_dir}/evaluate.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/eval/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
 
 fi
 

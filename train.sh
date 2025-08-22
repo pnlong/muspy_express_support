@@ -6,17 +6,17 @@
 
 # A place to store the command-line inputs for different models to train.
 
-# sh /home/pnlong/model_musescore/train.sh
+# sh /home/pnlong/muspy_express/train.sh
 
 # CONSTANTS
 ##################################################
 
 # software filepaths
-software_dir="/home/pnlong/model_musescore"
+software_dir="/home/pnlong/muspy_express"
 software="${software_dir}/train.py"
 
 # defaults
-data_dir="/home/pnlong/musescore/datav"
+data_dir="/deepfreeze/pnlong/muspy_express/experiments"
 gpu=-1 # gpu number
 unidimensional=""
 resume=""
@@ -81,7 +81,7 @@ done
 paths_train="${data_dir}/train.txt"
 paths_valid="${data_dir}/valid.txt"
 encoding="${data_dir}/encoding.json"
-output_dir="${data_dir}"
+output_dir="${data_dir}/models"
 
 # constants
 batch_size=12 # decrease if gpu memory consumption is too high
@@ -100,16 +100,16 @@ set -e # stop if there's an error
 # python ${software} --baseline --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
 
 # prefix, conditional on expressive features
-# python ${software} --conditioning "prefix" --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+python ${software} --conditioning "prefix" --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
 
 # anticipation, conditional on expressive features
 # python ${software} --conditioning "anticipation" --sigma ${sigma} --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
 
 # prefix, conditional on notes
-python ${software} --conditioning "prefix" --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+# python ${software} --conditioning "prefix" --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
 
 # anticipation, conditional on notes
-python ${software} --conditioning "anticipation" --sigma ${sigma} --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+# python ${software} --conditioning "anticipation" --sigma ${sigma} --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
 
 # prefix, not conditional
 # python ${software} --conditioning "prefix" --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}

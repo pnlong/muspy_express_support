@@ -50,7 +50,7 @@ import utils
 
 DATA_DIR = "/home/pnlong/musescore/datav"
 OUTPUT_DIR = "/home/pnlong/musescore/datav"
-PROJECT_NAME = "ExpressionNet-Train"
+PROJECT_NAME = "muspy-express"
 INFER_RUN_NAME_STRING = "-1"
 
 DEFAULT_MAX_SEQ_LEN = 1024
