@@ -139,8 +139,8 @@ def reconstruct(
     music = muspy_express.Music(
         resolution = resolution,
         tempos = [muspy_express.classes.Tempo(time = 0, qpm = representation.DEFAULT_QPM)],
-        key_signatures = [muspy_express.classes.KeySignature(time = 0)],
-        time_signatures = [muspy_express.classes.TimeSignature(time = 0, numerator = 4, denominator = 0)],
+        key_signatures = [muspy_express.classes.KeySignature(time = 0, fifths = 0)],
+        time_signatures = [muspy_express.classes.TimeSignature(time = 0, numerator = 4, denominator = 4)],
         real_time = use_absolute_time and (not infer_metrical_time),
     )
     infer_metrical_time = (infer_metrical_time and use_absolute_time) # update infer_metrical_time; only true when we want to infer metrical time and we are using absolute time
@@ -236,7 +236,8 @@ def reconstruct(
                         music.barlines.append(muspy_express.classes.Barline(time = time))
                     music.barlines.append(muspy_express.classes.Barline(time = time, subtype = value.replace("-barline", "")))
                 case "KeySignature":
-                    fifths = music.key_signatures[-1].fifths + int(value.replace("key-signature-change-", ""))
+                    previous_key_signature_fifths = music.key_signatures[-1].fifths if music.key_signatures[-1].fifths is not None else 0
+                    fifths = previous_key_signature_fifths + int(value.replace("key-signature-change-", ""))
                     if fifths <= -6:
                         fifths = fifths + 12
                     elif fifths > 6:
@@ -248,9 +249,10 @@ def reconstruct(
                     else:
                         music.key_signatures.append(key_signature_obj)
                 case "TimeSignature":
-                    if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["TimeSignature"]: # skip if unknown time signature change
+                    previous_numerator, previous_denominator = music.time_signatures[-1].numerator, music.time_signatures[-1].denominator
+                    if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["TimeSignature"] or previous_numerator == 0 or previous_denominator == 0: # skip if unknown time signature change
                         continue
-                    numerator, denominator = 4 * eval(value.replace(representation.TIME_SIGNATURE_CHANGE_PREFIX, "")) * (music.time_signatures[-1].numerator / music.time_signatures[-1].denominator), 4 # default is 4/4
+                    numerator, denominator = 4 * eval(value.replace(representation.TIME_SIGNATURE_CHANGE_PREFIX, "")) * (previous_numerator / previous_denominator), 4 # default is 4/4
                     while denominator < 16:
                         if min(numerator % 1, -(numerator % 1) + 1) < 0.25:
                             break
