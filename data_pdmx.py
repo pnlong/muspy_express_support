@@ -46,7 +46,7 @@ warnings.filterwarnings("ignore", category = muspy_express.inputs.musescore.Muse
 
 PDMX_FILEPATH = "/deepfreeze/pnlong/PDMX/PDMX/PDMX.csv"
 MUSESCORE_DIR = "/data2/zachary/musescore/data"
-OUTPUT_DIR = "/deepfreeze/pnlong/muspy_express/experiments"
+OUTPUT_DIR = "/deepfreeze/pnlong/muspy_express/experiments/metrical"
 OUTPUT_COLUMNS = ("path", "musescore", "track", "metadata", "version", "n")
 TIMEOUT = 20 * 60 # 20 minutes
 

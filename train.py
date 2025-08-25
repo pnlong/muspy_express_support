@@ -104,7 +104,7 @@ def parse_args(args = None, namespace = None):
     parser.add_argument("--unidimensional", action = "store_true", help = "Should we train a model with unidimensional, as opposed to multidimensional, inputs?")
     # training
     parser.add_argument("--steps", default = 100000, type = int, help = "Number of steps")
-    parser.add_argument("--valid_steps", default = 1000, type = int, help = "Validation frequency")
+    parser.add_argument("--valid_steps", default = 2000, type = int, help = "Validation frequency")
     parser.add_argument("--early_stopping", action = argparse.BooleanOptionalAction, default = False, help = "Whether to use early stopping")
     parser.add_argument("--early_stopping_tolerance", default = 20, type = int, help = "Number of extra validation rounds before early stopping")
     parser.add_argument("-lr", "--learning_rate", default = 0.0005, type = float, help = "Learning rate")
@@ -176,7 +176,9 @@ def calculate_loss_statistics(losses: torch.tensor, mask: torch.tensor = None, u
 
     # loss by field
     losses_field = torch.sum(input = losses, dim = list(range(len(losses.shape) - 1))).nan_to_num(nan = 0.0) # get sum of losses
-    losses_field /= torch.sum(input = mask.byte(), dim = list(range(len(mask.shape) - 1))) # average losses
+    mask_counts = torch.sum(input = mask.byte(), dim = list(range(len(mask.shape) - 1))) # count of valid tokens
+    mask_counts = torch.clamp(mask_counts, min = 1) # prevent division by zero: replace zeros with ones
+    losses_field /= mask_counts # average losses
     losses_field = losses_field.tolist() # convert to python list
 
     # loss
@@ -288,7 +290,7 @@ if __name__ == "__main__":
         mkdir(CHECKPOINTS_DIR)
 
     # start a new wandb run to track the script
-    group_name = ("absolute" if use_absolute_time else "metrical") + ("-unidimensional" if args.unidimensional else "") # basename(dirname(args.output_dir))
+    group_name = ("real" if use_absolute_time else "metrical") + ("-unidimensional" if args.unidimensional else "") # basename(dirname(args.output_dir))
     if (run_name == INFER_RUN_NAME_STRING):
         run_name = next(filter(lambda name: name.startswith(basename(args.output_dir)), (run.name for run in wandb.Api().runs(f"philly/{PROJECT_NAME}", filters = {"group": group_name}))), None) # try to infer the run name
         args.resume = (run_name != None) # redefine args.resume in the event that no run name was supplied, but we can't infer one either

@@ -16,10 +16,11 @@ software_dir="/home/pnlong/muspy_express"
 software="${software_dir}/train.py"
 
 # defaults
-data_dir="/deepfreeze/pnlong/muspy_express/experiments"
+data_dir="/deepfreeze/pnlong/muspy_express/experiments/metrical"
 gpu=-1 # gpu number
 unidimensional=""
 resume=""
+training_number=0 # which training to run (0-6)
 
 # small model architecture, the default
 dim=512 # dimension
@@ -33,8 +34,8 @@ heads=8 # attention heads
 ##################################################
 
 # parse command line arguments
-usage="Usage: $(basename ${0}) [-d] (data directory) [-u] (unidimensional?) [-r] (resume?) [-sml] (small/medium/large) [-g] (gpu to use)"
-while getopts ':d:g:ursmlh' opt; do
+usage="Usage: $(basename ${0}) [-d] (data directory) [-u] (unidimensional?) [-r] (resume?) [-sml] (small/medium/large) [-g] (gpu to use) [-n] (training number 0-6)"
+while getopts ':d:g:n:ursmlh' opt; do
   case "${opt}" in
     d) # also implies metrical/absolute time
       data_dir="${OPTARG}"
@@ -63,6 +64,9 @@ while getopts ':d:g:ursmlh' opt; do
     g) # gpu to use
       gpu="${OPTARG}"
       ;;
+    n) # training number to run
+      training_number="${OPTARG}"
+      ;;
     h)
       echo ${usage}
       exit 0
@@ -84,8 +88,8 @@ encoding="${data_dir}/encoding.json"
 output_dir="${data_dir}/models"
 
 # constants
-batch_size=12 # decrease if gpu memory consumption is too high
-steps=100000 # in my experience >70000 is sufficient to train
+batch_size=8 # decrease if gpu memory consumption is too high
+steps=80000 # in my experience >70000 is sufficient to train
 sigma=8 # for anticipation, in seconds or beats depending on which time scale we are using
 
 ##################################################
@@ -96,26 +100,23 @@ sigma=8 # for anticipation, in seconds or beats depending on which time scale we
 
 set -e # stop if there's an error
 
-# baseline
-# python ${software} --baseline --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# prefix, conditional on expressive features
-python ${software} --conditioning "prefix" --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# anticipation, conditional on expressive features
-# python ${software} --conditioning "anticipation" --sigma ${sigma} --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# prefix, conditional on notes
-# python ${software} --conditioning "prefix" --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# anticipation, conditional on notes
-# python ${software} --conditioning "anticipation" --sigma ${sigma} --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# prefix, not conditional
-# python ${software} --conditioning "prefix" --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
-
-# anticipation, not conditional
-# python ${software} --conditioning "anticipation" --sigma ${sigma} --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+if [ "${training_number}" -eq 0 ]; then # baseline
+  python ${software} --baseline --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 1 ]; then # prefix, conditional on expressive features
+  python ${software} --conditioning "prefix" --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 2 ]; then # anticipation, conditional on expressive features
+  python ${software} --conditioning "anticipation" --sigma ${sigma} --conditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 3 ]; then # prefix, conditional on notes
+  python ${software} --conditioning "prefix" --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 4 ]; then # anticipation, conditional on notes
+  python ${software} --conditioning "anticipation" --sigma ${sigma} --econditional --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 5 ]; then # prefix, not conditional
+  python ${software} --conditioning "prefix" --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+elif [ "${training_number}" -eq 6 ]; then # anticipation, not conditional
+  python ${software} --conditioning "anticipation" --sigma ${sigma} --aug --paths_train ${paths_train} --paths_valid ${paths_valid} --encoding ${encoding} --output_dir ${output_dir} --batch_size ${batch_size} --steps ${steps} --dim ${dim} --layers ${layers} --heads ${heads} --gpu ${gpu} ${unidimensional} ${resume}
+else
+  echo "Error: Training number must be 0-6. Provided: ${training_number}"
+  exit 1
+fi
 
 ##################################################
-

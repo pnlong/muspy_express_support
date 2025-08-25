@@ -21,6 +21,7 @@ from copy import copy
 from read_mscz.music import MusicExpress
 from read_mscz.classes import *
 from read_mscz.read_mscz import read_musescore
+import warnings
 ##################################################
 
 
@@ -540,8 +541,11 @@ def encode_data(
     if use_absolute_time:
         time_code_map = encoding["time_code_map"]
         time_dim = encoding["dimensions"].index("time")
-        data = np.delete(arr = data, obj = [representation.DIMENSIONS.index("beat"), representation.DIMENSIONS.index("position")], axis = 1) # remove beat, position column
-        data = np.insert(arr = data, obj = time_dim, values = data[:, representation.DIMENSIONS.index("time.s") - 2], axis = 1) # add time column
+        time_s_values = data[:, representation.DIMENSIONS.index("time.s")] # extract time.s values BEFORE deleting columns
+        cols_to_remove = [representation.DIMENSIONS.index("beat"), representation.DIMENSIONS.index("position"), 
+                         representation.DIMENSIONS.index("time"), representation.DIMENSIONS.index("time.s")] # remove beat, position, time, and time.s columns (since we'll replace with just time)
+        data = np.delete(arr = data, obj = cols_to_remove, axis = 1)
+        data = np.insert(arr = data, obj = time_dim, values = time_s_values, axis = 1) # add time column
     else:
         max_position = encoding["resolution"]
         beat_code_map = encoding["beat_code_map"]
@@ -587,7 +591,7 @@ def encode_data(
         try:
             code = value_code_map[None if value == "" else value]
         except KeyError:
-            value = sub(pattern = "-", repl = "", string = value) # try wrangling value a bit to get a key
+            value = sub(pattern = "-", repl = "", string = str(value)) # try wrangling value a bit to get a key
             value = unidecode(string = value) # get rid of accented characters (normalize)
             try:
                 code = value_code_map[None if value == "" else value]
@@ -609,7 +613,8 @@ def encode_data(
     if use_absolute_time:
         floor_time = lambda time: math.floor(time / representation.TIME_STEP) * representation.TIME_STEP
         duration_code_mapper = lambda duration: duration_code_map[floor_time(float(min(max_duration, max(0, duration))))]
-        time_code_mapper = lambda time: time_code_map[floor_time(float(max(0, time)))]
+        # time_code_mapper = lambda time: time_code_map[floor_time(float(min(max_temporal, max(0, time))))]
+        time_code_mapper = lambda time: time_code_map[floor_time(float(max(0, time)))] if time <= max_temporal else -1
     else:
         duration_code_mapper = lambda duration: duration_code_map[int(min(max_duration, max(0, duration)))]
         beat_code_mapper = lambda beat: beat_code_map[max(0, int(beat))]
@@ -627,6 +632,7 @@ def encode_data(
     if use_absolute_time:
         core_codes[:, duration_dim] = list(map(duration_code_mapper, data[:, duration_dim])) # encode duration
         core_codes[:, time_dim] = list(map(time_code_mapper, data[:, time_dim])) # encode time
+        core_codes = core_codes[core_codes[:, time_dim] != -1] # remove events beyond max_temporal
     else:
         core_codes[:, duration_dim] = list(map(duration_code_mapper, data[:, duration_dim])) # encode duration
         core_codes[:, beat_dim] = list(map(beat_code_mapper, data[:, beat_dim])) # encode beat

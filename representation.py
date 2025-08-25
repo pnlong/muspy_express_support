@@ -25,8 +25,8 @@ from typing import Tuple, List, Callable
 
 RESOLUTION = 12
 MAX_BEAT = 256 # in beats
-MAX_TIME = 100 # in seconds
-TIME_STEP = 0.01 # in seconds
+MAX_TIME = 60 # in seconds, one minute
+TIME_STEP = 0.05 # in seconds
 MAX_DURATION = 768  # remember to modify known durations as well!
 MAX_DURATION_ABSOLUTE_TIME = 10 # in seconds
 MAX_VELOCITY = 127

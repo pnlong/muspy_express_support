@@ -13,7 +13,7 @@
 ##################################################
 
 software_dir="/home/pnlong/muspy_express"
-data_dir="/deepfreeze/pnlong/muspy_express/experiments"
+data_dir="/deepfreeze/pnlong/muspy_express/experiments/metrical"
 gpu=3
 model="truth"
 
@@ -54,7 +54,7 @@ done
 trained_models="${data_dir}/models/models.txt"
 paths_test="${data_dir}/test.txt"
 encoding="${data_dir}/encoding.json"
-output_dir="${data_dir}"
+output_dir="${data_dir}/models/${model}"
 n_samples=1000
 batch_size=8
 
@@ -75,8 +75,8 @@ if [[ ${model} == "truth" ]]; then
 
 else
 
-    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/eval/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
-    python ${software_dir}/evaluate.py --paths ${paths_test} --encoding ${encoding} --output_dir "${output_dir}/eval/${model}" --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
+    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir ${output_dir} --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
+    python ${software_dir}/evaluate.py --paths ${paths_test} --encoding ${encoding} --output_dir ${output_dir} --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
 
 fi
 

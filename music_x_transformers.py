@@ -39,6 +39,7 @@ from dataset import PAD_VALUE
 
 DEFAULT_IGNORE_INDEX = -100
 MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT = 5 # max number of tokens that can build up at final timestep before end of song token can be placed
+MAX_LOSS = 100.0 # for loss clipping, make None to turn off
 
 ##################################################
 
@@ -775,12 +776,26 @@ class MusicAutoregressiveWrapper(nn.Module):
         # create output
         output = self.net(x = xi, **kwargs)
         n_masked_tokens = torch.sum(input = conditional_mask, dim = None)
+
+        # prevent division by zero
+        if n_masked_tokens == 0:
+            # print("WARNING: No tokens are masked in for loss calculation! Setting n_masked_tokens to 1")
+            n_masked_tokens = 1
+            
         if self.net.unidimensional:
             losses = F.cross_entropy(input = output.transpose(1, 2), target = xo, ignore_index = self.ignore_index, reduction = "none") # calculate losses
+            if MAX_LOSS is not None:
+                losses = torch.clamp(losses, max = MAX_LOSS) # loss clipping for numerical stability
             losses = conditional_mask * losses # mask conditionally if necessary, zeroing out controls
             loss = torch.sum(input = losses, dim = None) / n_masked_tokens # single loss value
         else:
             losses = [F.cross_entropy(input = output[i].transpose(1, 2), target = xo[..., i], ignore_index = self.ignore_index, reduction = "none") for i in range(len(output))] # calculate losses
+            for i, loss_tensor in enumerate(losses):
+                extreme_count = torch.sum(loss_tensor > MAX_LOSS).item()
+                if extreme_count > 0 and hasattr(self, '_log_clipping'):
+                    print(f"DEBUG: Clipped {extreme_count} extreme losses in dimension {i} (max was {loss_tensor.max().item():.2e})") # optional: log when clipping occurs (for debugging)
+            if MAX_LOSS is not None:
+                losses = [torch.clamp(loss_tensor, max = MAX_LOSS) for loss_tensor in losses] # clip the losses for numerical stability
             losses = torch.cat(tensors = [losses_dimension.unsqueeze(dim = -1) for losses_dimension in losses], dim = -1) # combine list of losses into a matrix
             losses = torch.repeat_interleave(input = conditional_mask.unsqueeze(dim = -1), repeats = losses.shape[-1], dim = -1) * losses # mask conditionally if necessary, zeroing out controls
             loss_by_field = torch.sum(input = losses, dim = list(range(len(losses.shape) - 1))) / n_masked_tokens # calculate mean for each field, the field is the last dimension, so mean over all but the last dimension

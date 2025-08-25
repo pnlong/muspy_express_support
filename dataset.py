@@ -129,7 +129,7 @@ class MusicDataset(Dataset):
 
     def __getitem__(self, index: int):
 
-        # Get the name
+        # get path
         path = self.paths[index]
 
         # load data
@@ -157,8 +157,13 @@ class MusicDataset(Dataset):
                     if len(data_slice) > 10: # get a sufficiently large slice of values
                         break
                     trial += 1 # iterate trial
-                data_slice[:, self.temporal_dim] = data_slice[:, self.temporal_dim] - start # make sure slice beats start at 0
-                data = data_slice
+                if len(data_slice) <= 10: # if we couldn't find a good slice, fall back to the beginning
+                    # print(f"WARNING: Could not find sufficient data slice after 10 trials, using beginning of sequence: {path}")
+                    data_slice = data[data[:, self.temporal_dim] < self.max_temporal]
+                    start = 0
+                if len(data_slice) > 0:
+                    data_slice[:, self.temporal_dim] = data_slice[:, self.temporal_dim] - start # make sure slice beats start at 0
+                    data = data_slice
                 del data_slice
 
         # trim seq to max_temporal
