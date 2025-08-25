@@ -18,10 +18,15 @@ import utils
 import representation
 import math
 from copy import copy
-from read_mscz.music import MusicExpress
-from read_mscz.classes import *
-from read_mscz.read_mscz import read_musescore
 import warnings
+
+from os.path import dirname, realpath
+import sys
+sys.path.insert(0, dirname(realpath(__file__)))
+sys.path.insert(0, dirname(dirname(realpath(__file__))))
+
+from muspy2 import muspy as muspy_express
+
 ##################################################
 
 
@@ -101,7 +106,7 @@ def clean_up_text(text: str):
 ##################################################
 
 desired_expressive_feature_types = ("Text", "TextSpanner", "RehearsalMark", "Dynamic", "HairPinSpanner", "Fermata", "TempoSpanner", "TechAnnotation") # "Symbol"
-def scrape_annotations(annotations: List[Annotation], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_annotations(annotations: List[muspy_express.classes.Annotation], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape annotations. song_length is the length of the song (in time steps). use_implied_duration is whether or not to calculate an 'implied duration' value for features without duration."""
 
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
@@ -175,7 +180,7 @@ def scrape_annotations(annotations: List[Annotation], song_length: int, use_impl
     return pd.DataFrame(data = annotations_encoded, columns = output_columns)
 
 
-def scrape_barlines(barlines: List[Barline], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_barlines(barlines: List[muspy_express.classes.Barline], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape barlines. song_length is the length of the song (in time steps). use_implied_duration is whether or not to calculate an 'implied duration' value for features without duration."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
@@ -183,7 +188,7 @@ def scrape_barlines(barlines: List[Barline], song_length: int, use_implied_durat
     barlines_encoded = {key: utils.rep(x = None, times = len(barlines)) for key in output_columns} # create dictionary of lists
     if include_annotation_class_name:
         barlines_encoded[ANNOTATION_CLASS_NAME_STRING] = utils.rep(x = "Barline", times = len(barlines)) # if include the annotation class name
-    barlines.append(Barline(time = song_length, measure = 0)) # for duration
+    barlines.append(muspy_express.classes.Barline(time = song_length)) # for duration
     for i, barline in enumerate(barlines[:-1]):
         barlines_encoded["type"][i] = representation.EXPRESSIVE_FEATURE_TYPE_STRING
         barlines_encoded["value"][i] = check_text(text = (f"{barline.subtype.lower()}-" if barline.subtype is not None else "") + "barline")
@@ -194,14 +199,14 @@ def scrape_barlines(barlines: List[Barline], song_length: int, use_implied_durat
     return pd.DataFrame(data = barlines_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_time_signatures(time_signatures: List[TimeSignature], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_time_signatures(time_signatures: List[muspy_express.classes.TimeSignature], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape time_signatures. song_length is the length of the song (in time steps). use_implied_duration is whether or not to calculate an 'implied duration' value for features without duration."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
     time_signatures_encoded = {key: utils.rep(x = None, times = len(time_signatures) - 1) for key in output_columns} # create dictionary of lists
     if include_annotation_class_name:
         time_signatures_encoded[ANNOTATION_CLASS_NAME_STRING] = utils.rep(x = "TimeSignature", times = len(time_signatures) - 1) # if include the annotation class name
-    time_signatures.append(TimeSignature(time = song_length, measure = 0, numerator = 4, denominator = 4)) # for duration
+    time_signatures.append(muspy_express.classes.TimeSignature(time = song_length, numerator = 4, denominator = 4)) # for duration
     for i in range(1, len(time_signatures) - 1): # ignore first time_signature, since we are tracking changes in time_signature; also ignore last one, since it is used for duration
         time_signatures_encoded["type"][i - 1] = representation.EXPRESSIVE_FEATURE_TYPE_STRING
         if (time_signatures[i].numerator == 0) or (time_signatures[i].denominator == 0) or (time_signatures[i].denominator == None) or (time_signatures[i - 1].numerator == 0) or (time_signatures[i - 1].denominator == 0) or (time_signatures[i - 1].denominator == None):
@@ -214,14 +219,14 @@ def scrape_time_signatures(time_signatures: List[TimeSignature], song_length: in
     return pd.DataFrame(data = time_signatures_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_key_signatures(key_signatures: List[KeySignature], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_key_signatures(key_signatures: List[muspy_express.classes.KeySignature], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape key_signatures. song_length is the length of the song (in time steps). use_implied_duration is whether or not to calculate an 'implied duration' value for features without duration."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
     key_signatures_encoded = {key: utils.rep(x = None, times = len(key_signatures) - 1) for key in output_columns} # create dictionary of lists
     if include_annotation_class_name:
         key_signatures_encoded[ANNOTATION_CLASS_NAME_STRING] = utils.rep(x = "KeySignature", times = len(key_signatures) - 1) # if include the annotation class name
-    key_signatures.append(KeySignature(time = song_length, measure = 0)) # for duration
+    key_signatures.append(muspy_express.classes.KeySignature(time = song_length)) # for duration
     for i in range(1, len(key_signatures) - 1): # ignore first key_signature, since we are tracking changes in key_signature; also ignore last one, since it is used for duration
         key_signatures_encoded["type"][i - 1] = representation.EXPRESSIVE_FEATURE_TYPE_STRING
         distance = key_signatures[i].fifths - key_signatures[i - 1].fifths if all((key_signature.fifths != None for key_signature in key_signatures[i - 1:i + 1])) else 0 # calculate key change distance in circle of fifths
@@ -231,14 +236,14 @@ def scrape_key_signatures(key_signatures: List[KeySignature], song_length: int, 
     return pd.DataFrame(data = key_signatures_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_tempos(tempos: List[Tempo], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_tempos(tempos: List[muspy_express.classes.Tempo], song_length: int, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape tempos. song_length is the length of the song (in time steps). use_implied_duration is whether or not to calculate an 'implied duration' value for features without duration."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
     tempos_encoded = {key: utils.rep(x = None, times = len(tempos)) for key in output_columns} # create dictionary of lists
     if include_annotation_class_name:
         tempos_encoded[ANNOTATION_CLASS_NAME_STRING] = utils.rep(x = "Tempo", times = len(tempos)) # if include the annotation class name
-    tempos.append(Tempo(time = song_length, measure = 0, qpm = 0.0)) # for duration
+    tempos.append(muspy_express.classes.Tempo(time = song_length, qpm = 0.0)) # for duration
     for i, tempo in enumerate(tempos[:-1]):
         tempos_encoded["type"][i] = representation.EXPRESSIVE_FEATURE_TYPE_STRING
         tempos_encoded["value"][i] = check_text(text = representation.QPM_TEMPO_MAPPER(qpm = tempo.qpm)) # check_text(text = tempo.text.lower() if tempo.text is not None else "tempo-marking")
@@ -247,7 +252,7 @@ def scrape_tempos(tempos: List[Tempo], song_length: int, use_implied_duration: b
     return pd.DataFrame(data = tempos_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_notes(notes: List[Note], include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_notes(notes: List[muspy_express.classes.Note], include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape notes (and grace notes)."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
 
@@ -273,7 +278,7 @@ def scrape_notes(notes: List[Note], include_velocity: bool = False, include_anno
 # SCRAPE IMPLICIT FEATURES
 ##################################################
 
-def scrape_articulations(annotations: List[Annotation], maximum_gap: int, articulation_count_threshold: int = 4, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_articulations(annotations: List[muspy_express.classes.Annotation], maximum_gap: int, articulation_count_threshold: int = 4, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape articulations. maximum_gap is the maximum distance (in time steps) between articulations, which, when exceeded, forces the ending of the current articulation chunk and the creation of a new one. articulation_count_threshold is the minimum number of articulations in a chunk to make it worthwhile recording."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
@@ -313,7 +318,7 @@ def scrape_articulations(annotations: List[Annotation], maximum_gap: int, articu
     return pd.DataFrame(data = articulations_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_slurs(annotations: List[Annotation], minimum_duration: float, music: MusicExpress, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_slurs(annotations: List[muspy_express.classes.Annotation], minimum_duration: float, music: muspy_express.Music, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape slurs. minimum_duration is the minimum duration (in seconds) a slur needs to be to make it worthwhile recording."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
@@ -339,7 +344,7 @@ def scrape_slurs(annotations: List[Annotation], minimum_duration: float, music: 
     return pd.DataFrame(data = slurs_encoded, columns = output_columns) # create dataframe from scraped values
 
 
-def scrape_pedals(annotations: List[Annotation], minimum_duration: float, music: MusicExpress, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def scrape_pedals(annotations: List[muspy_express.classes.Annotation], minimum_duration: float, music: muspy_express.Music, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Scrape pedals. minimum_duration is the minimum duration (in seconds) a pedal needs to be to make it worthwhile recording."""
     output_columns = representation.DIMENSIONS + ([ANNOTATION_CLASS_NAME_STRING,] if include_annotation_class_name else []) # output columns
     if not include_velocity: output_columns.remove("velocity") # remove velocity column if not wanted
@@ -367,7 +372,7 @@ def scrape_pedals(annotations: List[Annotation], minimum_duration: float, music:
 # WRAPPER FUNCTIONS MAKE CODE EASIER TO READ
 ##################################################
 
-def get_system_level_expressive_features(music: MusicExpress, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def get_system_level_expressive_features(music: muspy_express.Music, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Wrapper function to make code more readable. Extracts system-level expressive features."""
     song_length = music.get_end_time()
     system_annotations = scrape_annotations(annotations = music.annotations, song_length = song_length, use_implied_duration = use_implied_duration, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
@@ -378,7 +383,7 @@ def get_system_level_expressive_features(music: MusicExpress, use_implied_durati
     system_level_expressive_features = pd.concat(objs = (system_annotations, system_barlines, system_time_signatures, system_key_signatures, system_tempos), axis = 0, ignore_index = True)
     return system_level_expressive_features
 
-def get_staff_level_expressive_features(track: Track, music: MusicExpress, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
+def get_staff_level_expressive_features(track: muspy_express.classes.Track, music: muspy_express.Music, use_implied_duration: bool = True, include_velocity: bool = False, include_annotation_class_name: bool = False) -> pd.DataFrame:
     """Wrapper function to make code more readable. Extracts staff-level expressive features."""
     song_length = music.get_end_time()
     staff_notes = scrape_notes(notes = track.notes, include_velocity = include_velocity, include_annotation_class_name = include_annotation_class_name)
@@ -395,13 +400,13 @@ def get_staff_level_expressive_features(track: Track, music: MusicExpress, use_i
 ##################################################
 
 def extract_data(
-        music: MusicExpress,
+        music: muspy_express.Music,
         use_implied_duration: bool = True,
         include_velocity: bool = False,
         use_absolute_time: bool = False,
         include_annotation_class_name: bool = False
     ) -> np.array:
-    """Return a MusicExpress object as a data sequence.
+    """Return a muspy_express.Music object as a data sequence.
     Each row of the output is a note specified as follows.
         (event_type, beat, position, value, duration (in seconds or beats depending on `use_absolute_time`), program, velocity (if `include_velocity`), time, time (in seconds), annotation_class_name (if `include_annotation_class_name`))
     """
@@ -444,7 +449,7 @@ def extract_data(
         # get beats (accounting for time signature) # beats = sorted(list(set([beat.time for beat in music.beats] + [music.song_length,]))) # add song length to end of beats for calculating position
         # if len(music.time_signatures) > 0:
         #     beats = []
-        #     time_signatures = music.time_signatures + [TimeSignature(time = music.song_length, measure = 0, numerator = 4, denominator = 4),]
+        #     time_signatures = music.time_signatures + [TimeSignature(time = music.song_length, numerator = 4, denominator = 4),]
         #     for i in range(len(time_signatures) - 1):
         #         beats += list(range(time_signatures[i].time, time_signatures[i + 1].time, int(music.resolution * (4 / time_signatures[i].denominator))))
         # else: # assume 4/4
@@ -695,7 +700,7 @@ def encode_data(
 
 
 def encode(
-        music: MusicExpress,
+        music: muspy_express.Music,
         use_implied_duration: bool = True,
         encoding: dict = DEFAULT_ENCODING,
         conditioning: str = DEFAULT_CONDITIONING,
@@ -704,7 +709,7 @@ def encode(
         unidimensional: bool = False,
         unidimensional_encoding_function: Callable = representation.get_unidimensional_coding_functions(encoding = DEFAULT_ENCODING)[0]
     ) -> np.array:
-    """Given a MusicExpress object, encode it."""
+    """Given a muspy_express.Music object, encode it."""
 
     # determine include_velocity and use_absolute_time
     include_velocity = encoding["include_velocity"]
@@ -746,7 +751,7 @@ if __name__ == "__main__":
 
     # print an example
     print(f"{'Example':=^40}")
-    music = read_musescore(path = "/data2/pnlong/musescore/test_data/laufey/from_the_start.mscz")
+    music = muspy_express.read_musescore(path = "/data2/pnlong/musescore/test_data/laufey/from_the_start.mscz")
     print(f"Music:\n{music}")
     music.realize_expressive_features()
 

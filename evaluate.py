@@ -110,9 +110,10 @@ def n_expressive_features(expressive_features: pd.DataFrame, stem: str, output_f
 
 def density(expressive_features: pd.DataFrame, music: MusicExpress, stem: str, output_filepath: str):
     """Given a dataframe with expressive features, calculate the density of expressive features and output to a csv file."""
+    song_length = music.get_end_time()
     density = {
-        "time_steps": (music.song_length / len(expressive_features)) if len(expressive_features) != 0 else 0,
-        "seconds": (music.metrical_time_to_absolute_time(time_steps = music.song_length) / len(expressive_features)) if len(expressive_features) != 0 else 0
+        "time_steps": (song_length / len(expressive_features)) if len(expressive_features) != 0 else 0,
+        "seconds": (music.get_real_time(time = song_length) / len(expressive_features)) if len(expressive_features) != 0 else 0
         } # time unit per expressive feature
     density["path"] = stem
     density = pd.DataFrame(data = [density], columns = expressive_features_plots.DENSITY_COLUMNS)
@@ -131,7 +132,7 @@ def sparsity(expressive_features: pd.DataFrame, music: MusicExpress, stem: str, 
     sparsity = sparsity.rename(columns = {"time": "time_steps", parse_mscz.TIME_IN_SECONDS_COLUMN_NAME: "seconds"})
     sparsity["path"] = utils.rep(x = stem, times = len(sparsity))
     sparsity["beats"] = sparsity["time_steps"] / music.resolution
-    sparsity["fraction"] = sparsity["time_steps"] / (music.song_length + expressive_features_plots.DIVIDE_BY_ZERO_CONSTANT)
+    sparsity["fraction"] = sparsity["time_steps"] / (music.get_end_time() + expressive_features_plots.DIVIDE_BY_ZERO_CONSTANT)
     for successive_distance_column, distance_column in zip(expressive_features_plots.SUCCESSIVE_DISTANCE_COLUMNS, expressive_features_plots.DISTANCE_COLUMNS): # add successive times columns
         sparsity[successive_distance_column] = sparsity[distance_column]
     sparsity = sparsity[expressive_features_plots.SPARSITY_COLUMNS].sort_values("time_steps").reset_index(drop = True) # sort by increasing times
@@ -190,7 +191,7 @@ def evaluate(
     data = data[data[:, 0] == representation.EXPRESSIVE_FEATURE_TYPE_STRING] # filter down to just expressive features
     expressive_features = pd.DataFrame(data = data[:, [representation.DIMENSIONS.index("time"), data.shape[1] - 1, representation.DIMENSIONS.index("value")]], columns = parse_mscz.EXPRESSIVE_FEATURE_COLUMNS[:1] + parse_mscz.EXPRESSIVE_FEATURE_COLUMNS[2:]) # create pandas data frame
     del data
-    expressive_features[parse_mscz.TIME_IN_SECONDS_COLUMN_NAME] = expressive_features["time"].apply(lambda time: music.metrical_time_to_absolute_time(time_steps = time)) # add time in seconds column
+    expressive_features[parse_mscz.TIME_IN_SECONDS_COLUMN_NAME] = expressive_features["time"].apply(lambda time: music.get_real_time(time = time)) # add time in seconds column
     expressive_features = expressive_features[parse_mscz.EXPRESSIVE_FEATURE_COLUMNS] # reorder columns
     expressive_features["type"] = expressive_features["type"].apply(lambda expressive_feature_type: expressive_feature_type.replace("Spanner", ""))
 

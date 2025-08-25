@@ -22,14 +22,17 @@ import math
 import multiprocessing
 from glob import glob
 
-import muspy
 import numpy as np
 import pandas as pd
 import torch
 import torch.utils.data
 from tqdm import tqdm
 
-from read_mscz.music import MusicExpress
+from os.path import dirname, realpath
+import sys
+sys.path.insert(0, dirname(realpath(__file__)))
+sys.path.insert(0, dirname(dirname(realpath(__file__))))
+
 import dataset
 import music_x_transformers
 import representation
@@ -38,6 +41,7 @@ import encode
 import decode
 import utils
 from train import PARTITIONS, NA_VALUE, DEFAULT_MAX_SEQ_LEN
+from muspy2 import muspy as muspy_express
 
 ##################################################
 
@@ -119,7 +123,7 @@ def unpad_prefix(prefix: np.array, sos_token: int, pad_value: float = dataset.PA
 # EVALUATION METRICS
 ##################################################
 
-def pitch_class_entropy(music: MusicExpress) -> float:
+def pitch_class_entropy(music: muspy_express.Music) -> float:
     """Return the entropy of the normalized note pitch class histogram.
     Copied from https://salu133445.github.io/muspy/_modules/muspy/metrics/metrics.html#pitch_class_entropy
 
@@ -133,7 +137,7 @@ def pitch_class_entropy(music: MusicExpress) -> float:
 
     Parameters
     ----------
-    music : :class:`read_mscz.MusicExpress`
+    music : :class:`muspy_express.Music`
         Music object to evaluate.
 
     Returns
@@ -143,7 +147,7 @@ def pitch_class_entropy(music: MusicExpress) -> float:
 
     See Also
     --------
-    :func:`muspy.pitch_entropy` :
+    :func:`muspy_express.pitch_entropy` :
         Compute the entropy of the normalized pitch histogram.
 
     References
@@ -164,10 +168,10 @@ def pitch_class_entropy(music: MusicExpress) -> float:
     if denominator < 1:
         return math.nan
     prob = counter / denominator
-    return muspy.metrics.metrics._entropy(prob = prob)
+    return muspy_express.metrics.metrics._entropy(prob = prob)
 
 
-def scale_consistency(music: MusicExpress) -> float:
+def scale_consistency(music: muspy_express.Music) -> float:
     """Return the largest pitch-in-scale rate.
     Copied from https://salu133445.github.io/muspy/_modules/muspy/metrics/metrics.html#scale_consistency
 
@@ -181,7 +185,7 @@ def scale_consistency(music: MusicExpress) -> float:
 
     Parameters
     ----------
-    music : :class:`read_mscz.MusicExpress`
+    music : :class:`muspy_express.Music`
         Music object to evaluate.
 
     Returns
@@ -191,7 +195,7 @@ def scale_consistency(music: MusicExpress) -> float:
 
     See Also
     --------
-    :func:`muspy.pitch_in_scale_rate` :
+    :func:`muspy_express.pitch_in_scale_rate` :
         Compute the ratio of pitches in a certain musical scale.
 
     References
@@ -204,7 +208,7 @@ def scale_consistency(music: MusicExpress) -> float:
     max_in_scale_rate = 0.0
     for mode in ("major", "minor"):
         for root in range(12):
-            rate = muspy.metrics.metrics.pitch_in_scale_rate(music = music, root = root, mode = mode)
+            rate = muspy_express.metrics.metrics.pitch_in_scale_rate(music = music, root = root, mode = mode)
             if math.isnan(rate):
                 return math.nan
             if rate > max_in_scale_rate:
@@ -212,7 +216,7 @@ def scale_consistency(music: MusicExpress) -> float:
     return max_in_scale_rate
 
 
-def groove_consistency(music: MusicExpress, measure_resolution: int) -> float:
+def groove_consistency(music: muspy_express.Music, measure_resolution: int) -> float:
     """Return the groove consistency.
     Copied from https://salu133445.github.io/muspy/_modules/muspy/metrics/metrics.html#groove_consistency
 
@@ -233,7 +237,7 @@ def groove_consistency(music: MusicExpress, measure_resolution: int) -> float:
 
     Parameters
     ----------
-    music : :class:`read_mscz.MusicExpress`
+    music : :class:`muspy_express.Music`
         Music object to evaluate.
     measure_resolution : int
         Time steps per measure.

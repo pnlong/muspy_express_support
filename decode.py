@@ -11,14 +11,16 @@ import numpy as np
 from pretty_midi import note_number_to_name
 import argparse
 from typing import List, Callable
+
+from os.path import dirname, realpath
+import sys
+sys.path.insert(0, dirname(realpath(__file__)))
+sys.path.insert(0, dirname(dirname(realpath(__file__))))
+
 import representation
 from encode import encode, ENCODING_ARRAY_TYPE
-from read_mscz.music import MusicExpress
-from read_mscz.classes import *
-from read_mscz.read_mscz import read_musescore
-from read_mscz.output import FERMATA_TEMPO_SLOWDOWN
-from muspy.utils import CIRCLE_OF_FIFTHS
-from muspy import DEFAULT_RESOLUTION
+from muspy2 import muspy as muspy_express
+
 ##################################################
 
 
@@ -26,6 +28,9 @@ from muspy import DEFAULT_RESOLUTION
 ##################################################
 
 DEFAULT_ENCODING = representation.get_encoding()
+FERMATA_TEMPO_SLOWDOWN = muspy_express.outputs.midi.FERMATA_TEMPO_SLOWDOWN
+CIRCLE_OF_FIFTHS = muspy_express.utils.CIRCLE_OF_FIFTHS
+DEFAULT_RESOLUTION = muspy_express.DEFAULT_RESOLUTION
 
 ##################################################
 
@@ -123,21 +128,20 @@ def reconstruct(
         resolution: int,
         encoding: dict = DEFAULT_ENCODING,
         infer_metrical_time: bool = False,
-    ) -> MusicExpress:
-    """Reconstruct a data sequence as a MusicExpress object."""
+    ) -> muspy_express.Music:
+    """Reconstruct a data sequence as a muspy_express.Music object."""
 
     # determine include_velocity and use_absolute_time
     include_velocity = encoding["include_velocity"]
     use_absolute_time = encoding["use_absolute_time"]
 
-    # construct the MusicExpress object with defaults
-    music = MusicExpress(
+    # construct the muspy_express.Music object with defaults
+    music = muspy_express.Music(
         resolution = resolution,
-        tempos = [Tempo(time = 0, qpm = representation.DEFAULT_QPM)],
-        key_signatures = [KeySignature(time = 0)],
-        time_signatures = [TimeSignature(time = 0)],
-        infer_velocity = (not include_velocity),
-        absolute_time = use_absolute_time and (not infer_metrical_time),
+        tempos = [muspy_express.classes.Tempo(time = 0, qpm = representation.DEFAULT_QPM)],
+        key_signatures = [muspy_express.classes.KeySignature(time = 0)],
+        time_signatures = [muspy_express.classes.TimeSignature(time = 0, numerator = 4, denominator = 0)],
+        real_time = use_absolute_time and (not infer_metrical_time),
     )
     infer_metrical_time = (infer_metrical_time and use_absolute_time) # update infer_metrical_time; only true when we want to infer metrical time and we are using absolute time
 
@@ -149,7 +153,7 @@ def reconstruct(
                 - add start time (in metrical time)
                 - convert time from seconds to minutes
                 - multiply by qpm value to convert to quarter beats since start time
-                - multiply by MusicExpress resolution
+                - multiply by muspy_express.Music resolution
             """
             if np.isnan(start_time) or np.isinf(start_time_seconds):
                 start_time = 0
@@ -166,7 +170,7 @@ def reconstruct(
     # append the tracks
     programs = sorted(set(row[-2 if include_velocity else -1] for row in data)) # get programs
     for program in programs:
-        music.tracks.append(Track(program = program, is_drum = False, name = encoding["program_instrument_map"][program])) # append to tracks
+        music.tracks.append(muspy_express.classes.Track(program = program, is_drum = False, name = encoding["program_instrument_map"][program])) # append to tracks
 
     # prepare for adding the notes and expressive features
     ongoing_articulation_chunks = {track_index: {} for track_index in range(len(programs))}
@@ -178,7 +182,7 @@ def reconstruct(
     for row in data:
 
         # get velocity
-        velocity = row.pop(-1) if include_velocity else DEFAULT_VELOCITY # if there is a velocity value
+        velocity = row.pop(-1) if include_velocity else muspy_express.DEFAULT_VELOCITY # if there is a velocity value
 
         # get different fields, and make sure valid
         if use_absolute_time:
@@ -213,10 +217,10 @@ def reconstruct(
                 pitch = int(value) # make sure the pitch is in fact a pitch
             except (ValueError):
                 continue
-            music.tracks[track_index].notes.append(Note(time = time, pitch = pitch, duration = duration, velocity = velocity, is_grace = (event_type == "grace_note")))
+            music.tracks[track_index].notes.append(muspy_express.classes.Note(time = time, pitch = pitch, duration = duration, velocity = velocity, is_grace = (event_type == "grace_note")))
             for ongoing_articulation_chunk in tuple(ongoing_articulation_chunks[track_index].keys()): # add articulation if necessary
                 if time <= ongoing_articulation_chunks[track_index][ongoing_articulation_chunk]: # if the duration is still on
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = Articulation(subtype = ongoing_articulation_chunk)))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.Articulation(subtype = ongoing_articulation_chunk)))
                 else: # duration is over, delete this chunk, since it is no longer ongoing
                     del ongoing_articulation_chunks[track_index][ongoing_articulation_chunk]
         
@@ -229,8 +233,8 @@ def reconstruct(
             match expressive_feature_type:
                 case "Barline":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["Barline"]:
-                        music.barlines.append(Barline(time = time))
-                    music.barlines.append(Barline(time = time, subtype = value.replace("-barline", "")))
+                        music.barlines.append(muspy_express.classes.Barline(time = time))
+                    music.barlines.append(muspy_express.classes.Barline(time = time, subtype = value.replace("-barline", "")))
                 case "KeySignature":
                     fifths = music.key_signatures[-1].fifths + int(value.replace("key-signature-change-", ""))
                     if fifths <= -6:
@@ -238,7 +242,7 @@ def reconstruct(
                     elif fifths > 6:
                         fifths = fifths - 12
                     root, root_str = CIRCLE_OF_FIFTHS[fifths + CIRCLE_OF_FIFTHS.index((0, "C"))]
-                    key_signature_obj = KeySignature(time = time, root = root, fifths = fifths, root_str = root_str)
+                    key_signature_obj = muspy_express.classes.KeySignature(time = time, root = root, fifths = fifths, root_str = root_str)
                     if time == 0:
                         music.key_signatures[0] = key_signature_obj
                     else:
@@ -252,22 +256,22 @@ def reconstruct(
                             break
                         else:
                             numerator, denominator = numerator * 2, denominator * 2
-                    time_signature_obj = TimeSignature(time = time, numerator = round(numerator), denominator = denominator)
+                    time_signature_obj = muspy_express.classes.TimeSignature(time = time, numerator = round(numerator), denominator = denominator)
                     if time == 0:
                         music.time_signatures[0] = time_signature_obj
                     else:
                         music.time_signatures.append(time_signature_obj)
                 case "SlurSpanner":
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = SlurSpanner(duration = duration, is_slur = True)))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.SlurSpanner(duration = duration, is_slur = True)))
                 case "PedalSpanner":
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = PedalSpanner(duration = duration)))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.PedalSpanner(duration = duration)))
                 case "Fermata":
-                    music.annotations.append(Annotation(time = time, annotation = Fermata()))
+                    music.annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.Fermata()))
                     if infer_metrical_time:
                         absolute_to_metrical_time = get_absolute_to_metrical_time_func(start_time = time, start_time_seconds = time_seconds, qpm = music.tempos[-1].qpm / FERMATA_TEMPO_SLOWDOWN)
                         fermata_on, fermata_time = True, time_seconds
                 case "Tempo":
-                    tempo_obj = Tempo(time = time, qpm = representation.TEMPO_QPM_MAP[value], text = value)
+                    tempo_obj = muspy_express.classes.Tempo(time = time, qpm = representation.TEMPO_QPM_MAP[value], text = value)
                     if time == 0:
                         music.tempos[0] = tempo_obj
                     else:
@@ -277,15 +281,15 @@ def reconstruct(
                 case "TempoSpanner":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["TempoSpanner"]: # skip if unknown TempoSpanner
                         continue
-                    music.annotations.append(Annotation(time = time, annotation = TempoSpanner(duration = duration, subtype = value)))
+                    music.annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.TempoSpanner(duration = duration, subtype = value)))
                 case "Dynamic":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["Dynamic"]: # skip if unknown Dynamic
                         continue
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = Dynamic(subtype = value, velocity = representation.DYNAMIC_VELOCITY_MAP[value])))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.Dynamic(subtype = value, velocity = representation.DYNAMIC_VELOCITY_MAP[value])))
                 case "HairPinSpanner":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["HairPinSpanner"]: # skip if unknown HairPinSpanner
                         continue
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = HairPinSpanner(duration = duration, subtype = value)))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.HairPinSpanner(duration = duration, subtype = value)))
                 case "Articulation":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["Articulation"]: # skip if unknown articulation
                         continue
@@ -293,23 +297,23 @@ def reconstruct(
                 case "Text":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["Text"]: # skip if unknown text
                         continue
-                    music.annotations.append(Annotation(time = time, annotation = Text(text = value, is_system = True)))
+                    music.annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.Text(text = value, is_system = True)))
                 case "RehearsalMark":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["RehearsalMark"]: # skip if unknown RehearsalMark
                         continue
-                    music.annotations.append(Annotation(time = time, annotation = RehearsalMark(text = value)))
+                    music.annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.RehearsalMark(text = value)))
                 case "TextSpanner":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["TextSpanner"]: # skip if unknown TextSpanner
                         continue
-                    music.annotations.append(Annotation(time = time, annotation = TextSpanner(duration = duration, text = value, is_system = True)))
+                    music.annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.TextSpanner(duration = duration, text = value, is_system = True)))
                 case "TechAnnotation":
                     if value == representation.DEFAULT_EXPRESSIVE_FEATURE_VALUES["TechAnnotation"]: # skip if unknown TechAnnotation
                         continue
-                    music.tracks[track_index].annotations.append(Annotation(time = time, annotation = TechAnnotation(text = value)))
+                    music.tracks[track_index].annotations.append(muspy_express.classes.Annotation(time = time, annotation = muspy_express.annotations.TechAnnotation(text = value)))
         else:
             raise ValueError("Unknown event type.")
 
-    # return the filled MusicExpress
+    # return the filled muspy_express.Music
     return music
 
 
@@ -318,7 +322,7 @@ def decode(
         encoding: dict = DEFAULT_ENCODING,
         infer_metrical_time: bool = True,
         unidimensional_decoding_function: Callable = representation.get_unidimensional_coding_functions(encoding = DEFAULT_ENCODING)[-1]
-    ) -> MusicExpress:
+    ) -> muspy_express.Music:
     """Decode codes into a MusPy Music object.
     Each row of the input is encoded as follows.
         (event_type, beat, position, value, duration, instrument)
@@ -480,7 +484,7 @@ if __name__ == "__main__":
     #         (5, 4, 12, 63, 4, 33),
     #         (6, 0, 0, 0, 0, 0),
     #     ), dtype = ENCODING_ARRAY_TYPE)
-    music = read_musescore(path = "/data2/pnlong/musescore/test_data/laufey/from_the_start.mscz")
+    music = muspy_express.read_musescore(path = "/data2/pnlong/musescore/test_data/laufey/from_the_start.mscz")
     codes = encode(music = music, encoding = encoding)
     print(f"Codes:\n{codes}")
 

@@ -55,7 +55,7 @@ trained_models="${data_dir}/models/models.txt"
 paths_test="${data_dir}/test.txt"
 encoding="${data_dir}/encoding.json"
 output_dir="${data_dir}/models/${model}"
-n_samples=1000
+n_samples=256
 batch_size=8
 
 ##################################################
