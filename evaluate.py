@@ -148,7 +148,26 @@ def loss_for_perplexity(model, seq: torch.tensor, mask: torch.tensor, conditiona
 
     # get and wrangle losses
     _, losses_for_perplexity = model(seq = seq, mask = mask, return_list = True, reduce = False, return_output = False, conditional_mask = conditional_mask)
-    losses_for_perplexity = torch.mean(input = losses_for_perplexity.cpu().squeeze(dim = 0), dim = 0).tolist() # get rid of batch size dimension, then sum across sequence length
+    # losses_for_perplexity shape: (batch_size = 1, seq_len, n_dimensions) for multidimensional or (batch_size = 1, seq_len) for unidimensional
+    losses_for_perplexity = losses_for_perplexity.cpu().squeeze(dim = 0)  # remove batch dimension: (seq_len, n_dimensions) or (seq_len,)
+    
+    # Apply conditional mask to get only the losses we care about
+    conditional_mask_cpu = conditional_mask.cpu().squeeze(dim = 0)  # remove batch dimension
+    
+    # Calculate average loss per dimension (this is what we need for perplexity)
+    if len(losses_for_perplexity.shape) == 1: # unidimensional case
+        # Apply mask and calculate mean only over masked tokens
+        masked_losses = losses_for_perplexity[conditional_mask_cpu]
+        avg_loss = masked_losses.mean().item() if len(masked_losses) > 0 else 0.0
+        losses_for_perplexity = [avg_loss] # average over masked sequence length
+    else:  # multidimensional case
+        # Apply mask to each dimension and calculate mean only over masked tokens
+        losses_per_dim = []
+        for dim in range(losses_for_perplexity.shape[1]):
+            masked_losses_dim = losses_for_perplexity[conditional_mask_cpu, dim]
+            avg_loss_dim = masked_losses_dim.mean().item() if len(masked_losses_dim) > 0 else 0.0
+            losses_per_dim.append(avg_loss_dim)
+        losses_for_perplexity = losses_per_dim
 
     # convert to dataframe and output
     losses_for_perplexity = pd.DataFrame(data = [[stem, sum(losses_for_perplexity)] + losses_for_perplexity], columns = loss_for_perplexity_columns) # convert to dataframe
@@ -524,8 +543,18 @@ if __name__ == "__main__":
                         seq = batch["seq"][j].unsqueeze(dim = 0).to(device)
                         mask = batch["mask"][j].unsqueeze(dim = 0).to(device)
                         conditional_mask = torch.ones(size = seq.shape if unidimensional else seq.shape[:-1], dtype = torch.bool, device = device)
+                        
                         if not joint:
-                            conditional_mask = torch.isin(seq[:, 0::model.decoder.net.n_tokens_per_event] if unidimensional else seq[..., 0], test_elements = event_tokens, invert = False) # filter to just events for conditional masking
+                            # For conditional models, only compute loss on the tokens we're generating
+                            # event_tokens contains the types of events this conditional model generates
+                            if generation_type == GENERATION_TYPES[0]: # "totals" - generate everything
+                                conditional_mask = torch.ones_like(conditional_mask)  # compute loss on all tokens
+                            elif generation_type == GENERATION_TYPES[1]: # "notes" - generate only notes
+                                conditional_mask = torch.isin(seq[:, 0::model.decoder.net.n_tokens_per_event] if unidimensional else seq[..., 0], test_elements = torch.tensor([note_token, grace_note_token], device = device), invert = False)
+                            elif generation_type == GENERATION_TYPES[2]: # "expressive" - generate only expressive features
+                                conditional_mask = torch.isin(seq[:, 0::model.decoder.net.n_tokens_per_event] if unidimensional else seq[..., 0], test_elements = torch.tensor([expressive_feature_token], device = device), invert = False)
+                        
+                        # Remove the first event (start token) from conditional mask
                         conditional_mask = conditional_mask[:, model.decoder.net.n_tokens_per_event:]
                         # evaluate
                         evaluate(data = unpad_prefix(prefix = generated[j], sos_token = sos, pad_value = model.decoder.pad_value, n_tokens_per_event = model.decoder.net.n_tokens_per_event),
@@ -554,12 +583,34 @@ if __name__ == "__main__":
     if not args.truth:
         logging.info("\n" + "".join(("=" for _ in range(25))) + " PERPLEXITY " + "".join(("=" for _ in range(25))))
         for eval_type in EVAL_TYPES:
-            eval_type_fancy = eval_type.title() if eval_type == EVAL_TYPES[0] else (eval_type.split("_")[2].title() + "s conditional on " + eval_type.split("_")[1].title() + "s:")
+            eval_type_fancy = eval_type.title() if eval_type == EVAL_TYPES[0] else (eval_type.split("_")[2].title() + "s conditional on " + eval_type.split("_")[1].title() + "s")
+            eval_type_fancy += ":"
             logging.info("\n" + eval_type_fancy)
             losses_for_perplexity = pd.read_csv(filepath_or_buffer = output_filepaths[eval_type][-1], sep = ",", na_values = train.NA_VALUE, header = 0, index_col = False) # load in previous values
+            
             for field in losses_for_perplexity.columns[1:]:
-                loss_by_field = np.sum(losses_for_perplexity[field])
-                logging.info(f"  - {field.replace('loss_', '').title()}: " + (f"{math.exp(-math.log(loss_by_field)):.4f}" if loss_by_field != 0 else "NaN"))
+                # Calculate average loss across all samples for this field
+                # Note: each row already contains the average loss per token for that sample
+                avg_loss_by_field = np.mean(losses_for_perplexity[field])
+                
+                # Special handling for "Total" field - it's a sum of individual dimension losses
+                if field == f"loss_{train.ALL_STRING}":
+                    # The total field contains sum(individual_losses), not average loss per token
+                    # To get meaningful total perplexity, we need to calculate it differently
+                    # Option 1: Average the individual dimension losses to get overall average loss
+                    individual_fields = [col for col in losses_for_perplexity.columns[1:] if col != field]
+                    if individual_fields:
+                        # Calculate average loss across dimensions (not sum)
+                        avg_individual_losses = np.mean([np.mean(losses_for_perplexity[col]) for col in individual_fields])
+                        perplexity = math.exp(avg_individual_losses) if not np.isnan(avg_individual_losses) and avg_individual_losses > 0 else float("nan")
+                        logging.info(f"  - {field.replace('loss_', '').title()}: " + (f"{perplexity:.4f}" if not np.isnan(perplexity) else "NaN") + " (avg of dimensions)")
+                    else:
+                        logging.info(f"  - {field.replace('loss_', '').title()}: NaN (no individual dimensions found)")
+                    continue
+                
+                # Perplexity = exp(average_loss) for individual dimensions
+                perplexity = math.exp(avg_loss_by_field) if not np.isnan(avg_loss_by_field) and avg_loss_by_field > 0 else float("nan")
+                logging.info(f"  - {field.replace('loss_', '').title()}: " + (f"{perplexity:.4f}" if not np.isnan(perplexity) else "NaN"))
 
     ##################################################
 

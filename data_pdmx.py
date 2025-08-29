@@ -246,7 +246,7 @@ if __name__ == "__main__":
     pdmx = pdmx.drop(columns = list(filter(lambda column: column.startswith("subset:"), pdmx.columns))) # drop subset columns
     pdmx = pdmx[pdmx["has_annotations"]] # filter to have annotations
     pdmx = pdmx.reset_index(drop = True) # reset index
-    logging.info(f"Loaded PDMX with {len(pdmx)} paths.")       
+    logging.info(f"Loaded PDMX with {len(pdmx)} paths.")   
 
     # get musescore paths
     logging.info("Determining MuseScore paths...")
@@ -319,6 +319,14 @@ if __name__ == "__main__":
 
     # split into partitions
     subprocess.run(args = ["python", f"{dirname(__file__)}/split.py", "--input_filepath", MAPPING_OUTPUT_FILEPATH, "--output_dir", args.output_dir], check = True)
+
+    # log statistics
+    logging.info("PDMX Metric Statistics:")
+    for metric in ("pitch_class_entropy", "scale_consistency", "groove_consistency"):
+        mean = np.mean(pdmx[metric])
+        standard_deviation = np.std(pdmx[metric])
+        standard_error = np.std(pdmx[metric], ddof = 1) / np.sqrt(len(pdmx))
+        logging.info(f"- {metric}: mean = {mean:0.4f}, std = {standard_deviation:0.4f}, sem = {standard_error:0.4f}") 
 
     ##################################################
 

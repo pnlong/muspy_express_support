@@ -92,51 +92,138 @@ def split_camel_case(text: str) -> str:
     """
     return sub(pattern = r"([a-z])([A-Z])", repl = r"\1 \2", string = text) # find instances where a lowercase letter is followed by an uppercase letter and insert a space after the lowercase letter
 
+# get the y label from expression text type
+def get_y_label(expression_text_type: str) -> str:
+    """
+    Get the y label from expression text type.
+
+    Parameters
+    ----------
+    expression_text_type : str
+        Expression text type
+
+    Returns
+    -------
+    str
+        Y label from expression text type
+    """
+    label = split_camel_case(expression_text_type)
+    if label == "Key Signature Change":
+        return "Key Signature"
+    elif label == "Time Signature Change":
+        return "Time Signature"
+    elif label == "Barline":
+        return "Special Barline"
+    else:
+        return label
+
 ##################################################
 
 
 # PLOT EXPRESSION TEXT TYPES
 ##################################################
 
+# def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, output_filepath: str):
+#     """
+#     Plot expression text types as a boxplot.
+
+#     Parameters
+#     ----------
+#     data : pd.DataFrame
+#         Dataframe with expression text types, assumed to have two columns: ["expression_text_type", column_to_use]
+#     column_to_use : str
+#         Column name to use (either distance or duration for some timing metric)
+#     output_filepath : str
+#         Path to output file
+#     """
+    
+#     # create the horizontal boxplot
+#     plt.figure(figsize = (6, 4))
+
+#     # get order by median duration (descending)
+#     sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = column_to_use, ascending = False).index.tolist()
+#     signature_filter = lambda x: x == "KeySignature" or x == "TimeSignature"
+#     sorted_types = list(filter(lambda x: not signature_filter(x = x), sorted_types)) + list(filter(lambda x: signature_filter(x = x), sorted_types))
+#     del signature_filter
+
+#     # make boxplot
+#     sns.boxplot(data = data, x = column_to_use, y = "expression_text_type", orient = "h", order = sorted_types, showfliers = False)
+    
+#     # format the y-axis labels after plotting
+#     ax = plt.gca()
+#     y_labels = [get_y_label(expression_text_type = label.get_text()) for label in ax.get_yticklabels()]
+#     ax.set_yticklabels(labels = y_labels)
+    
+#     # set labels
+#     plt.xlabel(get_x_label(column_to_use = column_to_use))
+#     plt.ylabel("Expression Text Type")
+    
+#     # adjust layout to prevent label cutoff
+#     plt.tight_layout()
+    
+#     # save the plot
+#     plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
+#     plt.close()
+
 def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, output_filepath: str):
     """
-    Plot expression text types as a boxplot.
+    Plot expression text types as a split boxplot: main types and signature types in separate stacked plots.
 
     Parameters
     ----------
     data : pd.DataFrame
-        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", column_to_use]
+        Dataframe with expression text types, assumed to have two columns: ["expression_text_type", column_to_use"]
     column_to_use : str
         Column name to use (either distance or duration for some timing metric)
     output_filepath : str
         Path to output file
     """
-    
-    # create the horizontal boxplot
-    plt.figure(figsize = (6, 4))
 
-    # get order by median duration (descending)
-    sorted_types = data.groupby(by = "expression_text_type").median().sort_values(by = column_to_use, ascending = False).index.tolist()
+    # separate signature and non-signature types
+    signature_types = {"KeySignature", "TimeSignature"}
+    is_signature = data["expression_text_type"].isin(signature_types)
+    main_data = data[~is_signature]
+    signature_data = data[is_signature]
 
-    # make boxplot
-    sns.boxplot(data = data, x = column_to_use, y = "expression_text_type", orient = "h", order = sorted_types, showfliers = False)
-    
-    # format the y-axis labels after plotting
-    ax = plt.gca()
-    y_labels = [split_camel_case(label.get_text()) for label in ax.get_yticklabels()]
-    ax.set_yticklabels(labels = y_labels)
-    
-    # set labels
-    plt.xlabel(get_x_label(column_to_use = column_to_use))
-    plt.ylabel("Expression Text Type")
-    
-    # adjust layout to prevent label cutoff
+    # get orderings by median value, descending
+    main_order = main_data.groupby("expression_text_type")[column_to_use].median().sort_values(ascending = False).index.tolist()
+    signature_order = signature_data.groupby("expression_text_type")[column_to_use].median().sort_values(ascending = False).index.tolist()
+
+    # set up subplots: shared x-axis, stacked vertically
+    fig, (ax_main, ax_sig) = plt.subplots(
+        2, 1, sharex = True, figsize = (6, 4),
+        gridspec_kw = {"height_ratios": [len(main_order), len(signature_order)]}
+    )
+
+    # main plot (top)
+    sns.boxplot(
+        data = main_data, x = column_to_use, y = "expression_text_type",
+        orient = "h", order = main_order, showfliers = False, ax = ax_main,
+    )
+    ax_main.set_ylabel("Expression Text Type")
+    ax_main.set_xlabel("") # no x-axis label
+    ax_main.tick_params(axis = "x", which = "both", bottom = False, top = False, labelbottom = False) # hide x-axis ticks and labels
+
+    # format y-tick labels
+    main_y_labels = [get_y_label(expression_text_type = label.get_text()) for label in ax_main.get_yticklabels()]
+    ax_main.set_yticklabels(main_y_labels)
+
+    # signature plot (bottom)
+    sns.boxplot(
+        data = signature_data, x = column_to_use, y = "expression_text_type",
+        orient = "h", order = signature_order, showfliers = False, ax = ax_sig,
+    )
+    ax_sig.set_ylabel("") # no y-axis label
+    ax_sig.set_xlabel(get_x_label(column_to_use = column_to_use))
+
+    # format y-tick labels
+    sig_y_labels = [get_y_label(expression_text_type = label.get_text()) for label in ax_sig.get_yticklabels()]
+    ax_sig.set_yticklabels(sig_y_labels)
+
+    # adjust layout and save
     plt.tight_layout()
-    
-    # save the plot
     plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
     plt.close()
-    
 
 ##################################################
 

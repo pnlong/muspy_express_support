@@ -356,177 +356,186 @@ if __name__ == "__main__":
     # load model if necessary
     else:
 
-        # load training configurations
-        train_args_filepath = f"{args.output_dir}/train_args.json"
-        logging.info(f"Loading training arguments from: {train_args_filepath}")
-        train_args = utils.load_json(filepath = train_args_filepath)
-        logging.info(f"Using loaded arguments:\n{pprint.pformat(train_args)}")
-        del train_args_filepath
+        # to output evaluation metrics
+        output_filepath = f"{EVAL_DIR}/{basename(EVAL_DIR)}.csv"
+        output_columns_must_be_written = not (exists(output_filepath) and args.resume)
+        if output_columns_must_be_written: # if column names need to be written
+            pd.DataFrame(columns = OUTPUT_COLUMNS).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = True, index = False, mode = "w")
+        i_start = 0 # index from which to start evaluating
+        if not output_columns_must_be_written:
+            previous = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", na_values = NA_VALUE, header = 0, index_col = False) # load in previous values
+            if len(previous) > 0:
+                i_start = int(previous["i"].max(axis = 0)) + 1 # update start index
+                print(f"Resuming from index {i_start}.")
+            del previous
 
-        # get the specified device
-        device = torch.device(f"cuda:{args.gpu}" if args.gpu is not None else "cpu")
-        logging.info(f"Using device: {device}")
+        # only evaluate if necessary
+        if (i_start * args.batch_size) < args.n_samples:
 
-        # create the dataset
-        logging.info(f"Creating the data loader...")
-        max_seq_len = train_args["max_seq_len"]
-        conditioning = train_args["conditioning"]
-        unidimensional = train_args.get("unidimensional", False)
-        test_dataset = dataset.MusicDataset(paths = args.paths, encoding = encoding, conditioning = conditioning, max_seq_len = max_seq_len, use_augmentation = False, is_baseline = ("baseline" in args.output_dir), unidimensional = unidimensional, for_generation = True)
+            # load training configurations
+            train_args_filepath = f"{args.output_dir}/train_args.json"
+            logging.info(f"Loading training arguments from: {train_args_filepath}")
+            train_args = utils.load_json(filepath = train_args_filepath)
+            logging.info(f"Using loaded arguments:\n{pprint.pformat(train_args)}")
+            del train_args_filepath
 
-        # create the model
-        logging.info(f"Creating the model...")
-        use_absolute_time = encoding["use_absolute_time"]
-        model = music_x_transformers.MusicXTransformer(
-            dim = train_args["dim"],
-            encoding = encoding,
-            depth = train_args["layers"],
-            heads = train_args["heads"],
-            max_seq_len = max_seq_len,
-            max_temporal = encoding["max_" + ("time" if use_absolute_time else "beat")],
-            rotary_pos_emb = train_args["rel_pos_emb"],
-            use_abs_pos_emb = train_args["abs_pos_emb"],
-            emb_dropout = train_args["dropout"],
-            attn_dropout = train_args["dropout"],
-            ff_dropout = train_args["dropout"],
-            unidimensional = unidimensional,
-        ).to(device)
-        # kwargs = {"depth": train_args["layers"], "heads": train_args["heads"], "max_seq_len": max_seq_len, "max_temporal": encoding["max_" + ("time" if use_absolute_time else "beat")], "rotary_pos_emb": train_args["rel_pos_emb"], "use_abs_pos_emb": train_args["abs_pos_emb"], "emb_dropout": train_args["dropout"], "attn_dropout": train_args["dropout"], "ff_dropout": train_args["dropout"]} # for debugging
+            # get the specified device
+            device = torch.device(f"cuda:{args.gpu}" if args.gpu is not None else "cpu")
+            logging.info(f"Using device: {device}")
 
-        # load the checkpoint
-        CHECKPOINT_DIR = f"{args.output_dir}/checkpoints"
-        checkpoint_filepath = f"{CHECKPOINT_DIR}/best_model.{PARTITIONS[1]}.pth"
-        model_state_dict = torch.load(f = checkpoint_filepath, map_location = device)
-        model.load_state_dict(state_dict = model_state_dict)
-        logging.info(f"Loaded the model weights from: {checkpoint_filepath}")
-        model.eval()
-        
-        # get special tokens
-        if unidimensional:
-            unidimensional_encoding_order = encoding["unidimensional_encoding_order"]
-        sos = encoding["type_code_map"]["start-of-song"]
-        eos = encoding["type_code_map"]["end-of-song"]
-        is_anticipation = (conditioning == encode.CONDITIONINGS[-1])
-        sigma = train_args["sigma"] # if use_absolute_time else encode.SIGMA_METRICAL
-        unidimensional_encoding_function, unidimensional_decoding_function = representation.get_unidimensional_coding_functions(encoding = encoding)
-        
-    # to output evaluation metrics
-    output_filepath = f"{EVAL_DIR}/{basename(EVAL_DIR)}.csv"
-    output_columns_must_be_written = not (exists(output_filepath) and args.resume)
-    if output_columns_must_be_written: # if column names need to be written
-        pd.DataFrame(columns = OUTPUT_COLUMNS).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = True, index = False, mode = "w")
-    i_start = 0 # index from which to start evaluating
-    if not output_columns_must_be_written:
-        previous = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", na_values = NA_VALUE, header = 0, index_col = False) # load in previous values
-        if len(previous) > 0:
-            i_start = int(previous["i"].max(axis = 0)) + 1 # update start index
-            print(f"Resuming from index {i_start}.")
-        del previous
+            # create the dataset
+            logging.info(f"Creating the data loader...")
+            max_seq_len = train_args["max_seq_len"]
+            conditioning = train_args["conditioning"]
+            unidimensional = train_args.get("unidimensional", False)
+            test_dataset = dataset.MusicDataset(paths = args.paths, encoding = encoding, conditioning = conditioning, max_seq_len = max_seq_len, use_augmentation = False, is_baseline = ("baseline" in args.output_dir), unidimensional = unidimensional, for_generation = True)
 
-    ##################################################
+            # create the model
+            logging.info(f"Creating the model...")
+            use_absolute_time = encoding["use_absolute_time"]
+            model = music_x_transformers.MusicXTransformer(
+                dim = train_args["dim"],
+                encoding = encoding,
+                depth = train_args["layers"],
+                heads = train_args["heads"],
+                max_seq_len = max_seq_len,
+                max_temporal = encoding["max_" + ("time" if use_absolute_time else "beat")],
+                rotary_pos_emb = train_args["rel_pos_emb"],
+                use_abs_pos_emb = train_args["abs_pos_emb"],
+                emb_dropout = train_args["dropout"],
+                attn_dropout = train_args["dropout"],
+                ff_dropout = train_args["dropout"],
+                unidimensional = unidimensional,
+            ).to(device)
+            # kwargs = {"depth": train_args["layers"], "heads": train_args["heads"], "max_seq_len": max_seq_len, "max_temporal": encoding["max_" + ("time" if use_absolute_time else "beat")], "rotary_pos_emb": train_args["rel_pos_emb"], "use_abs_pos_emb": train_args["abs_pos_emb"], "emb_dropout": train_args["dropout"], "attn_dropout": train_args["dropout"], "ff_dropout": train_args["dropout"]} # for debugging
 
-
-    # EVALUATE
-    ##################################################
-
-    # create data loader and instantiate iterable
-    test_data_loader = torch.utils.data.DataLoader(dataset = test_dataset, num_workers = args.jobs, collate_fn = test_dataset.collate, batch_size = args.batch_size, shuffle = False)
-    test_iter = iter(test_data_loader)
-    chunk_size = int(args.batch_size / 2)
-
-    # iterate over the dataset
-    with torch.no_grad():
-        n_iterations = int((args.n_samples - 1) / args.batch_size) + 1
-        for i in tqdm(iterable = range(i_start, len(test_data_loader) if (args.n_samples is None) else n_iterations), desc = "Evaluating"):
-
-            # get new batch
-            batch = next(test_iter)
-            stem = i
-            if (args.n_samples is not None) and (i == n_iterations - 1): # if last iteration
-                n_samples = args.n_samples % args.batch_size
-                if (n_samples == 0):
-                    n_samples = args.batch_size
-                batch["seq"] = batch["seq"][:n_samples]
-                batch["mask"] = batch["mask"][:n_samples]
-                batch["seq_len"] = batch["seq_len"][:n_samples]
-                batch["path"] = batch["path"][:n_samples]
+            # load the checkpoint
+            CHECKPOINT_DIR = f"{args.output_dir}/checkpoints"
+            checkpoint_filepath = f"{CHECKPOINT_DIR}/best_model.{PARTITIONS[1]}.pth"
+            model_state_dict = torch.load(f = checkpoint_filepath, map_location = device)
+            model.load_state_dict(state_dict = model_state_dict)
+            logging.info(f"Loaded the model weights from: {checkpoint_filepath}")
+            model.eval()
             
-            if args.truth:
+            # get special tokens
+            if unidimensional:
+                unidimensional_encoding_order = encoding["unidimensional_encoding_order"]
+            sos = encoding["type_code_map"]["start-of-song"]
+            eos = encoding["type_code_map"]["end-of-song"]
+            is_anticipation = (conditioning == encode.CONDITIONINGS[-1])
+            sigma = train_args["sigma"] # if use_absolute_time else encode.SIGMA_METRICAL
+            unidimensional_encoding_function, unidimensional_decoding_function = representation.get_unidimensional_coding_functions(encoding = encoding)
 
-                # GROUND TRUTH
-                ##################################################
-
-                # get ground truth
-                truth = batch["seq"]
-                truth = pad(data = [truth[j][truth[j, :, 0] != expressive_feature_token] for j in range(len(truth))]) # filter out expressive features
-
-                # add to results
-                def evaluate_helper(j: int) -> dict:
-                    return evaluate(data = truth[j], encoding = encoding, stem = f"{stem}_{j}", eval_dir = eval_output_dir)
-                with multiprocessing.Pool(processes = args.jobs) as pool:
-                    results = pool.map(func = evaluate_helper, iterable = range(len(truth)), chunksize = chunk_size)
-
-                ##################################################
-
-            else:
-
-                # UNCONDITIONED GENERATION
-                ##################################################
-
-                eval_dir = eval_output_dir
-                generated_output_filepaths = glob(pathname = f"{eval_dir}/{stem}_*.npy")
-                generated_output_filepaths_exist = tuple(map(exists, generated_output_filepaths))
-                if (not all(generated_output_filepaths_exist)) or (len(generated_output_filepaths_exist) == 0):
-
-                    # get output start tokens
-                    prefix = torch.repeat_interleave(input = torch.tensor(data = [sos] + ([0] * (len(encoding["dimensions"]) - 1)), dtype = torch.long).reshape(1, 1, len(encoding["dimensions"])), repeats = len(batch["seq"]), dim = 0).cpu().numpy()
-                    if unidimensional:
-                        for dimension_index in range(prefix.shape[-1]):
-                            prefix[..., dimension_index] = unidimensional_encoding_function(code = prefix[..., dimension_index], dimension_index = dimension_index)
-                        prefix = prefix[..., unidimensional_encoding_order].flatten(start_dim = 1)
-                    prefix = torch.from_numpy(prefix).to(device)
-
-                    # generate new samples
-                    generated = model.generate(
-                        seq_in = prefix,
-                        seq_len = args.seq_len,
-                        eos_token = eos,
-                        temperature = args.temperature,
-                        filter_logits_fn = args.filter,
-                        filter_thres = args.filter_thres,
-                        monotonicity_dim = ("type", "time" if use_absolute_time else "beat"),
-                        joint = False,
-                        notes_are_controls = False,
-                        is_anticipation = is_anticipation,
-                        sigma = sigma
-                    )
-                    # kwargs = {"eos_token": eos, "temperature": args.temperature, "filter_logits_fn": args.filter, "filter_thres": args.filter_thres, "monotonicity_dim": ("type", "time" if use_absolute_time else "beat")}
-                    generated = torch.cat(tensors = (prefix, generated), dim = 1).cpu().numpy()
-
-                else:
-                
-                    # load in previously generated samples
-                    generated = dataset.pad(data = list(map(np.load, generated_output_filepaths)), front = True)
-
-                # add to results
-                def evaluate_helper(j: int) -> dict:
-                    return evaluate(data = unpad_prefix(prefix = generated[j], sos_token = sos, pad_value = model.decoder.pad_value, n_tokens_per_event = model.decoder.net.n_tokens_per_event), encoding = encoding, stem = f"{stem}_{j}", eval_dir = eval_dir, unidimensional_decoding_function = unidimensional_decoding_function)
-                with multiprocessing.Pool(processes = args.jobs) as pool:
-                    results = pool.map(func = evaluate_helper, iterable = range(len(generated)), chunksize = chunk_size)
-
-                ##################################################
-
-            # OUTPUT STATISTICS
             ##################################################
 
-            pd.DataFrame(data = [[i, batch["path"][j]] + list(results[j].values()) for j in range(len(results))], columns = OUTPUT_COLUMNS).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
-            
+
+            # EVALUATE
             ##################################################
+
+            # create data loader and instantiate iterable
+            test_data_loader = torch.utils.data.DataLoader(dataset = test_dataset, num_workers = args.jobs, collate_fn = test_dataset.collate, batch_size = args.batch_size, shuffle = False)
+            test_iter = iter(test_data_loader)
+            chunk_size = int(args.batch_size / 2)
+
+            # iterate over the dataset
+            with torch.no_grad():
+                n_iterations = int((args.n_samples - 1) / args.batch_size) + 1
+                for i in tqdm(iterable = range(i_start, len(test_data_loader) if (args.n_samples is None) else n_iterations), desc = "Evaluating"):
+
+                    # get new batch
+                    batch = next(test_iter)
+                    stem = i
+                    if (args.n_samples is not None) and (i == n_iterations - 1): # if last iteration
+                        n_samples = args.n_samples % args.batch_size
+                        if (n_samples == 0):
+                            n_samples = args.batch_size
+                        batch["seq"] = batch["seq"][:n_samples]
+                        batch["mask"] = batch["mask"][:n_samples]
+                        batch["seq_len"] = batch["seq_len"][:n_samples]
+                        batch["path"] = batch["path"][:n_samples]
+                    
+                    if args.truth:
+
+                        # GROUND TRUTH
+                        ##################################################
+
+                        # get ground truth
+                        truth = batch["seq"]
+                        truth = pad(data = [truth[j][truth[j, :, 0] != expressive_feature_token] for j in range(len(truth))]) # filter out expressive features
+
+                        # add to results
+                        def evaluate_helper(j: int) -> dict:
+                            return evaluate(data = truth[j], encoding = encoding, stem = f"{stem}_{j}", eval_dir = eval_output_dir)
+                        with multiprocessing.Pool(processes = args.jobs) as pool:
+                            results = pool.map(func = evaluate_helper, iterable = range(len(truth)), chunksize = chunk_size)
+
+                        ##################################################
+
+                    else:
+
+                        # UNCONDITIONED GENERATION
+                        ##################################################
+
+                        eval_dir = eval_output_dir
+                        generated_output_filepaths = glob(pathname = f"{eval_dir}/{stem}_*.npy")
+                        generated_output_filepaths_exist = tuple(map(exists, generated_output_filepaths))
+                        if (not all(generated_output_filepaths_exist)) or (len(generated_output_filepaths_exist) == 0):
+
+                            # get output start tokens
+                            prefix = torch.repeat_interleave(input = torch.tensor(data = [sos] + ([0] * (len(encoding["dimensions"]) - 1)), dtype = torch.long).reshape(1, 1, len(encoding["dimensions"])), repeats = len(batch["seq"]), dim = 0).cpu().numpy()
+                            if unidimensional:
+                                for dimension_index in range(prefix.shape[-1]):
+                                    prefix[..., dimension_index] = unidimensional_encoding_function(code = prefix[..., dimension_index], dimension_index = dimension_index)
+                                prefix = prefix[..., unidimensional_encoding_order].flatten(start_dim = 1)
+                            prefix = torch.from_numpy(prefix).to(device)
+
+                            # generate new samples
+                            generated = model.generate(
+                                seq_in = prefix,
+                                seq_len = args.seq_len,
+                                eos_token = eos,
+                                temperature = args.temperature,
+                                filter_logits_fn = args.filter,
+                                filter_thres = args.filter_thres,
+                                monotonicity_dim = ("type", "time" if use_absolute_time else "beat"),
+                                joint = False,
+                                notes_are_controls = False,
+                                is_anticipation = is_anticipation,
+                                sigma = sigma
+                            )
+                            # kwargs = {"eos_token": eos, "temperature": args.temperature, "filter_logits_fn": args.filter, "filter_thres": args.filter_thres, "monotonicity_dim": ("type", "time" if use_absolute_time else "beat")}
+                            generated = torch.cat(tensors = (prefix, generated), dim = 1).cpu().numpy()
+
+                        else:
+                        
+                            # load in previously generated samples
+                            generated = dataset.pad(data = list(map(np.load, generated_output_filepaths)), front = True)
+
+                        # add to results
+                        def evaluate_helper(j: int) -> dict:
+                            return evaluate(data = unpad_prefix(prefix = generated[j], sos_token = sos, pad_value = model.decoder.pad_value, n_tokens_per_event = model.decoder.net.n_tokens_per_event), encoding = encoding, stem = f"{stem}_{j}", eval_dir = eval_dir, unidimensional_decoding_function = unidimensional_decoding_function)
+                        with multiprocessing.Pool(processes = args.jobs) as pool:
+                            results = pool.map(func = evaluate_helper, iterable = range(len(generated)), chunksize = chunk_size)
+
+                        ##################################################
+
+                    # OUTPUT STATISTICS
+                    ##################################################
+
+                    pd.DataFrame(data = [[i, batch["path"][j]] + list(results[j].values()) for j in range(len(results))], columns = OUTPUT_COLUMNS).to_csv(path_or_buf = output_filepath, sep = ",", na_rep = NA_VALUE, header = False, index = False, mode = "a")
+                    
+                    ##################################################
+
+        else:
+            logging.info(f"Skipping evaluation because necessary samples already generated.")
 
     # log statistics
     results = pd.read_csv(filepath_or_buffer = output_filepath, sep = ",", na_values = NA_VALUE, header = 0, index_col = False) # load in previous values
     for eval_metric in EVAL_METRICS:
-        logging.info(f"- {eval_metric}: mean = {np.nanmean(a = results[eval_metric], axis = 0):.4f}, std = {np.nanstd(a = results[eval_metric], axis = 0):.4f}")
+        mean = np.nanmean(a = results[eval_metric], axis = 0)
+        standard_deviation = np.nanstd(a = results[eval_metric], axis = 0)
+        standard_error = np.nanstd(a = results[eval_metric], axis = 0, ddof = 1) / np.sqrt(len(results))
+        logging.info(f"- {eval_metric}: mean = {mean:.4f}, std = {standard_deviation:.4f}, sem = {standard_error:.4f}")
 
     ##################################################
 

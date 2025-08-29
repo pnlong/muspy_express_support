@@ -75,7 +75,7 @@ if [[ ${model} == "truth" ]]; then
 
 else
 
-    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir ${output_dir} --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
+    python ${software_dir}/evaluate_baseline.py --paths ${paths_test} --encoding ${encoding} --output_dir ${output_dir} --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size} --resume
     python ${software_dir}/evaluate.py --paths ${paths_test} --encoding ${encoding} --output_dir ${output_dir} --n_samples ${n_samples} --gpu ${gpu} --batch_size ${batch_size}
 
 fi

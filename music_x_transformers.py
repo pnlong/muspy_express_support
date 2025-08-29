@@ -224,6 +224,30 @@ class MusicTransformerWrapper(nn.Module):
 
 def sample(logits: torch.tensor, kind: str, threshold: float, temperature: float, min_p_pow: float, min_p_ratio: float):
     """Sample from the logits with a specific sampling strategy."""
+    
+    # check input logits
+    if torch.isnan(input = logits).any():
+        raise ValueError("NaN in logits before softmax")
+    
+    # Handle all-inf case with emergency fallback
+    if torch.isinf(input = logits).any():
+        # Check if ALL logits are -inf for any sequence
+        all_inf_mask = torch.all(torch.isinf(logits), dim=-1)  # shape: (batch_size,)
+        if all_inf_mask.any():
+            print(f"WARNING: Found {all_inf_mask.sum().item()} sequences with all -inf logits, applying emergency fallback")
+            # For sequences with all -inf, set the first token to 0
+            for seq_idx in torch.where(all_inf_mask)[0]:
+                logits[seq_idx, 0] = 0.0
+                print(f"  Emergency fallback: sequence {seq_idx} token 0 set to 0.0")
+        
+        # If there are still any inf values after fallback, raise error
+        if torch.isinf(input = logits).any():
+            remaining_inf = torch.isinf(logits)
+            if not torch.all(remaining_inf == (logits == -float('inf'))):  # if there are +inf values
+                raise ValueError("Positive Inf in logits before softmax")
+            # All remaining inf should be -inf, which is fine for masking
+    
+    # sample
     if kind == "top_k":
         probs = F.softmax(top_k(logits = logits, frac_num_tokens = threshold) / temperature, dim = -1)
     elif kind == "top_p":
@@ -234,7 +258,19 @@ def sample(logits: torch.tensor, kind: str, threshold: float, temperature: float
     #     probs = entmax(logits / temperature, alpha = ENTMAX_ALPHA, dim = -1)
     else:
         raise ValueError(f"Unknown sampling strategy: {kind}")
-
+    
+    # check sampled output
+    if torch.isnan(input = probs).any():
+        raise ValueError("NaN in probs after softmax")
+    if (probs < 0).any():
+        raise ValueError("Negative probs found")
+    if not torch.allclose(probs.sum(dim = -1), torch.ones_like(probs.sum(dim = -1)), atol = 1e-2):
+        raise ValueError("Probabilities don't sum to 1")
+    
+    # return
+    assert not torch.any(input = probs < 0), "Probability tensor must be all greater than or equal to 0."
+    assert not torch.any(input = torch.isinf(input = probs)), "Probability tensor must be all finite."
+    assert not torch.any(input = torch.isnan(input = probs)), "Probability tensor cannot be nan."
     return torch.multinomial(input = probs, num_samples = 1)
 
 ##################################################
@@ -514,7 +550,7 @@ class MusicAutoregressiveWrapper(nn.Module):
                         controls[seq_index] = controls[seq_index][len(relevant_controls):]
                 output = self.pad(sequences = [seq.unsqueeze(dim = 0) for seq in sequences], device = output.device, pad_value = self.pad_value)
                 mask = self.pad(sequences = [seq.unsqueeze(dim = 0) for seq in mask], device = output.device, pad_value = False)
-                del sequences
+                del sequences            
 
             ##################################################
 
@@ -533,10 +569,14 @@ class MusicAutoregressiveWrapper(nn.Module):
                     x = output_temp[:, -self.max_seq_len:]
 
                     # get logits (and perhaps attn)
+                    assert not torch.isnan(input = x).any(), "x contains NaN"
+                    assert not torch.isnan(input = mask).any(), "mask contains NaN"
                     if return_attn:
                         logits, attn = self.net(x = x, mask = mask_temp, return_attn = True, **kwargs)
                     else:
                         logits = self.net(x = x, mask = mask_temp, return_attn = False, **kwargs)
+                    if torch.isnan(input = logits).any():
+                        raise ValueError("Model output logits contain NaN")
 
                     # get most recent logits
                     logits = logits[:, -1]
@@ -560,6 +600,18 @@ class MusicAutoregressiveWrapper(nn.Module):
                         logits[:, control_type_codes] = -float("inf") # don't allow for the control type
                         logits[:, control_value_codes] = -float("inf") # don't allow for control values
 
+                    # FINAL safety check: ensure at least one valid token per sequence (AFTER ALL MASKING)
+                    for seq_idx in range(logits.shape[0]):
+                        if torch.all(torch.isinf(logits[seq_idx])):
+                            # Emergency fallback: find ANY valid token in this dimension
+                            dim_start = self.dimension_code_range_starts[dimension_index]
+                            dim_end = min([start for start in self.dimension_code_range_starts if start > dim_start] + [logits.shape[-1]])
+                            
+                            # Try to find a non-none token first
+                            fallback_token = dim_start + 1 if (dim_start + 1) < dim_end else dim_start
+                            logits[seq_idx, fallback_token] = 0.0
+                            print(f"WARNING: All tokens masked for sequence {seq_idx} dimension {dimension_index}, emergency fallback to token {fallback_token}")
+                    
                     # sample from the restricted logits
                     sampled = sample(logits = logits, kind = filter_logits_fn[dimension_index], threshold = filter_thres[dimension_index], temperature = temperature[dimension_index], min_p_pow = min_p_pow, min_p_ratio = min_p_ratio).flatten() # length is batch_size
 
@@ -626,10 +678,15 @@ class MusicAutoregressiveWrapper(nn.Module):
                 x = output[:, -self.max_seq_len:]
 
                 # get logits (and perhaps attn)
+                assert not torch.isnan(input = x).any(), "x contains NaN"
+                assert not torch.isnan(input = mask).any(), "mask contains NaN"
                 if return_attn:
                     logits, attn = self.net(x = x, mask = mask, return_attn = True, **kwargs)
                 else:
                     logits = self.net(x = x, mask = mask, return_attn = False, **kwargs)
+                for i, logit in enumerate(logits):
+                    if torch.isnan(input = logit).any():
+                        raise ValueError(f"Logits in dimension {i} contain NaN")
 
                 # get most recent logits
                 logits = [logit[:, -1, :] for logit in logits] # first dim is batch size, next is sequence length, next is the vocabulary for that field
@@ -644,17 +701,28 @@ class MusicAutoregressiveWrapper(nn.Module):
                 # filter out sos token
                 logits[self.type_dim][:, self.sos_type_code] = -float("inf") # the 0th token should be the sos token
 
+                # don't allow for sampling of controls if conditional
+                if not joint:
+                    logits[self.type_dim][:, control_type_codes] = -float("inf") # don't allow for the control type
+                    logits[self.value_dim][:, control_value_codes] = -float("inf") # don't allow for control values
+
+                # FINAL safety check: ensure at least one valid token per sequence (AFTER ALL MASKING)
+                type_logits = logits[self.type_dim]
+                for seq_idx in range(type_logits.shape[0]):
+                    if torch.all(torch.isinf(type_logits[seq_idx])):
+                        # Emergency fallback: find ANY non-sos token and allow it
+                        for token_idx in range(type_logits.shape[-1]):
+                            if token_idx != self.sos_type_code:  # anything except sos
+                                type_logits[seq_idx, token_idx] = 0.0
+                                print(f"WARNING: All type tokens masked for sequence {seq_idx}, emergency fallback to token {token_idx}")
+                                break
+                
                 # sample from the logits
                 event_types = sample(logits = logits[self.type_dim], kind = filter_logits_fn[self.type_dim], threshold = filter_thres[self.type_dim], temperature = temperature[self.type_dim], min_p_pow = min_p_pow, min_p_ratio = min_p_ratio).flatten().tolist() # length is batch_size
 
                 # update current values
                 if (monotonicity_dim is not None) and (self.type_dim in monotonicity_dim):
                     current_values[self.type_dim] = [max(current_value, event_type) for current_value, event_type in zip(current_values[self.type_dim], event_types)]
-
-                # don't allow for sampling of controls if conditional
-                if not joint:
-                    logits[self.type_dim][:, control_type_codes] = -float("inf") # don't allow for the control type
-                    logits[self.value_dim][:, control_value_codes] = -float("inf") # don't allow for control values
 
                 # iterate after each sample
                 batch_event = torch.zeros(size = (batch_size, 1, dim), dtype = output.dtype, device = output.device)
@@ -669,6 +737,16 @@ class MusicAutoregressiveWrapper(nn.Module):
                     # an instrument code
                     if (event_type == self.instrument_type_code):
                         logits[self.instrument_dim][:, 0] = -float("inf") # avoid none in instrument dimension
+                        
+                        # FINAL safety check: ensure at least one valid instrument token
+                        inst_logits = logits[self.instrument_dim][seq_index]
+                        if torch.all(torch.isinf(inst_logits)):
+                            # Emergency fallback: allow any non-none instrument
+                            for token_idx in range(1, inst_logits.shape[0]):  # start from 1 to skip 'none'
+                                logits[self.instrument_dim][seq_index, token_idx] = 0.0
+                                print(f"WARNING: All instrument tokens masked for sequence {seq_index}, emergency fallback to token {token_idx}")
+                                break
+                        
                         sampled = sample(logits = logits[self.instrument_dim][seq_index].unsqueeze(dim = 0), kind = filter_logits_fn[self.instrument_dim], threshold = filter_thres[self.instrument_dim], temperature = temperature[self.instrument_dim], min_p_pow = min_p_pow, min_p_ratio = min_p_ratio).item()
                         batch_event[seq_index, :, self.instrument_dim] = sampled
 
@@ -680,6 +758,16 @@ class MusicAutoregressiveWrapper(nn.Module):
                                 logits[d][seq_index, :current_values[d][seq_index]] = -float("inf")
                             # sample from the logits
                             logits[d][:, 0] = -float("inf") # avoid none in value dimension
+                            
+                            # FINAL safety check: ensure at least one valid token for this dimension
+                            dim_logits = logits[d][seq_index]
+                            if torch.all(torch.isinf(dim_logits)):
+                                # Emergency fallback: allow any non-none token
+                                for token_idx in range(1, dim_logits.shape[0]):  # start from 1 to skip 'none'
+                                    logits[d][seq_index, token_idx] = 0.0
+                                    print(f"WARNING: All tokens masked for sequence {seq_index} dimension {d}, emergency fallback to token {token_idx}")
+                                    break
+                            
                             sampled = sample(logits = logits[d][seq_index].unsqueeze(dim = 0), kind = filter_logits_fn[d], threshold = filter_thres[d], temperature = temperature[d], min_p_pow = min_p_pow, min_p_ratio = min_p_ratio).item()
                             batch_event[seq_index, :, d] = sampled
                             if (d == self.temporal_dim) and is_anticipation:

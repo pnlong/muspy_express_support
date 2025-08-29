@@ -289,6 +289,7 @@ if __name__ == "__main__":
         parser.add_argument("--input_filepath", type = str, default = f"{OUTPUT_DIR}/{DATASET_NAME}.csv", help = "Path to input file.")
         parser.add_argument("--expression_text_types_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to expression text types file.")
         parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
+        parser.add_argument("--include_signatures", action = "store_true", help = "Include time and key signatures in the plot.")
         parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
@@ -332,6 +333,9 @@ if __name__ == "__main__":
     dataset = pd.read_csv(filepath_or_buffer = args.expression_text_types_filepath, sep = ",", header = 0, index_col = False, usecols = ["id", "expression_text_type"])
     if not args.include_lyrics: # filter out lyrics if not included
         dataset = dataset[dataset["expression_text_type"] != "Lyric"]
+    if not args.include_signatures: # filter out signatures if not included
+        dataset = dataset[dataset["expression_text_type"] != "TimeSignature"]
+        dataset = dataset[dataset["expression_text_type"] != "KeySignature"]
     print("Completed reading in input data.")
 
     # wrangle input data
@@ -342,7 +346,7 @@ if __name__ == "__main__":
 
     # make duration boxplot
     print("Making expression text by composer boxplot...")
-    plot_expression_text_by_composer_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_composer" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf")
+    plot_expression_text_by_composer_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_composer" + ("_with_lyrics" if args.include_lyrics else "") + ("_with_signatures" if args.include_signatures else "") + ".pdf")
     print("Completed making expression text by composer boxplot.")
 
     # output statistics on song count by composer
