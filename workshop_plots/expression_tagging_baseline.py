@@ -242,7 +242,7 @@ if __name__ == "__main__":
         #     total = len(batches))
         
         # initialize counters for correct and total predictions
-        correct_counts_by_field = {dim: 0 for dim in [ALL_STRING] + encoding["dimensions"]}
+        correct_counts_by_field = np.zeros(shape = len(encoding["dimensions"]) + 1, dtype = np.int32)
         total_count = 0 # total count of expression text tokens
         # for processed_batch in processed_batches:
         #     correct_counts_by_field_batch, total_count_batch = processed_batch
@@ -256,17 +256,17 @@ if __name__ == "__main__":
             for seq in batch["seq"]: # iterate through sequences in the batch
                 seq = seq.cpu().numpy()
                 seq = seq[seq[:, type_idx] == expressive_feature_code] # filter just for expression text
-                for i, dim in enumerate(encoding["dimensions"]): # iterate through dimensions
-                    correct_counts_by_field[dim] += (seq[:, i] == model[i]).sum().item()
-                correct_counts_by_field[ALL_STRING] += np.all(seq == model, axis = 1).sum().item()
+                correct = (seq == model)
+                correct_counts_by_field[1:] += np.sum(correct, axis = 0).item()
+                correct_counts_by_field[0] += np.sum(np.all(seq == model, axis = 1), axis = 0).item()
                 total_count += seq.shape[0]
 
         # compute accuracy for each field
         results = pd.DataFrame(data = {
-            "field": correct_counts_by_field.keys(),
-            "count_correct": list(correct_counts_by_field.values()),
+            "field": [ALL_STRING] + encoding["dimensions"],
+            "count_correct": correct_counts_by_field,
             "count_total": [total_count] * len(correct_counts_by_field),
-            "accuracy": [correct_count / total_count for correct_count in correct_counts_by_field.values()]
+            "accuracy": correct_counts_by_field / total_count,
         })
         results.to_csv(path_or_buf = results_output_filepath, sep = ",", na_rep = NA_VALUE, header = True, index = False)
         print(f"Saved results to {results_output_filepath}.")
