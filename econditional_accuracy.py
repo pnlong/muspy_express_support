@@ -29,7 +29,7 @@ def parse_args(args = None, namespace = None):
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(prog = "Accuracy", description = "Calculate the accuracy of the expression-conditional-on-notes model's predictions.")
     parser.add_argument("--data_dir", type = str, default = DATA_DIR, help = "Path to data directory.")
-    parser.add_argument("--mask_type", type = str, default = "note", choices = ("total", "note", "expressive"), help = "Type of mask to use.")
+    parser.add_argument("--mask_type", type = str, default = "expressive", choices = ("total", "note", "expressive"), help = "Type of mask to use.")
     return parser.parse_args(args = args, namespace = namespace)
 
 ##################################################
