@@ -329,3 +329,8 @@ td {
 .support-code-opacity {
   opacity: 0.7 !important;
 }
+
+/* Fixed width table buttons */
+.btn-table-section {
+  min-width: 140px !important;
+}
