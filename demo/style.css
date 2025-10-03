@@ -337,5 +337,6 @@ td {
 
 .equal-width-table td {
   width: 33.33% !important;
+  vertical-align: middle !important;
 }
 
