@@ -330,7 +330,12 @@ td {
   opacity: 0.7 !important;
 }
 
-/* Fixed width table buttons */
-.btn-table-section {
-  min-width: 140px !important;
+/* Equal width table columns */
+.equal-width-table {
+  table-layout: fixed !important;
 }
+
+.equal-width-table td {
+  width: 33.33% !important;
+}
+
