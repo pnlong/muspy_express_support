@@ -1,0 +1,671 @@
+<!doctype html>
+<html>
+<head>
+	<title>MusPyExpress Demo</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="shortcut icon" type="image/x-icon" href="resources/archive.svg"> <!-- favicon -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  	<link href="style.css" rel="stylesheet" type="text/css">
+	<meta property="og:image" content="resources/teaser.png"/> 
+	<meta property="og:title" content="MusPyExpress Demo" />
+	<meta property="og:description" content="Demo page for MusPyExpress: Extending MusPy with Enhanced Expression Text Support" />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+	<script src="https://kit.fontawesome.com/ad96f96272.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+	
+	<!-- navigation bar on the top, nav bar stick to the top -->
+	<nav id="navbar_top" class="navbar sticky-top navbar-expand-lg navbar-dark bg-primary" style="margin-bottom: 15px;">
+		<div class="container">
+				<a class="navbar-brand" href="">MusPyExpress</a>
+			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="main_nav">
+			<ul class="navbar-nav ms-auto">
+				<li class="nav-item"><a class="nav-link" href="#images">Images</a></li>
+				<li class="nav-item"><a class="nav-link" href="#audio">Audio</a></li>
+				<li class="nav-item"><a class="nav-link" href="#video">Video</a></li>
+				<li class="nav-item"><a class="nav-link" href="#paper">Paper</a></li>
+			</ul>
+			</div> 
+		</div> 
+		</nav>
+	<!-- end nav bar -->
+
+
+	<!-- MAIN PAGE -->
+	<div class="container-xl"> 
+
+
+
+
+		<!-- top button -->
+		<button type="button" class="btn btn-danger btn-floating btn-lg" id="btn-back-to-top">
+			<i class="fas fa-arrow-up"></i>
+		</button>
+		<!-- end top button -->
+
+
+
+		<!-- top - author names, affiliation and links -->
+		<center>
+			<h1>MusPyExpress: Extending MusPy with Enhanced Expression Text Support</h1>
+			<h4>NeurIPS 2025 Workshop on AI for Music: Where Creativity Meets Computation</h4>
+			<div class="container">
+				<div class="row justify-content-md-center">
+					<div class="col-md-auto">
+						<span style="font-size:24px"><a href="https://pnlong.github.io/portfolio/" target="_blank" rel="noopener noreferrer">Phillip Long</a><sup>1</sup></span>
+					</div>
+					<div class="col-md-auto">
+						<span style="font-size:24px"><a href="https://hermandong.com/" target="_blank" rel="noopener noreferrer">Hao-Wen Dong</a><sup>2</sup></span>
+					</div>
+					<div class="col-md-auto">
+						<span style="font-size:24px"><a href="https://cseweb.ucsd.edu/~jmcauley/" target="_blank" rel="noopener noreferrer">Julian McAuley</a><sup>1</sup></span>
+					</div>
+					<div class="col-md-auto">
+						<span style="font-size:24px"><a href="https://zacharynovack.github.io/" target="_blank" rel="noopener noreferrer">Zachary Novack</a><sup>1</sup></span>
+					</div>
+				</div>
+			</div>
+
+			<p class="text-center affilation" style="font-size: 20pt;"><sup>1</sup>University of California, San Diego<br><sup>2</sup>University of Michigan, Ann Arbor<p>
+
+
+
+
+			<!-- LINK ICONS -->
+			<div class="container">
+				<div class="row justify-content-md-center">
+					<div class="col-md-auto">
+						<span><a class="btn btn-outline-primary" href='resources/paper.pdf' role="button" style="font-size: 24px;"><i class="fas fa-file-pdf"></i> Paper</a></span>
+					</div>
+					<!-- <div class="col-md-auto">
+						<span><a class="btn btn-outline-primary" href='resources/supp.pdf' role="button" style="font-size: 24px;"><i class="fas fa-file-pdf"></i> Supplementary</a></span>
+					</div> -->
+					<div class="col-md-auto">
+						<span><a class="btn btn-outline-primary" href='https://github.com/' role="button" style="font-size: 24px;"><i class="fab fa-github"></i> Code</a></span>
+					</div>
+				</div>
+			</div>
+		</center>
+		<!-- end top -->
+
+
+
+
+		<!-- TEASER IMAGE AND ABSTRACT -->
+		<center>
+			<div class="container" style="margin-top: 20px;">
+				<div class="row justify-content-md-center">
+					<p  style="font-size:18px;"><strong>MusPyExpress</strong></p>
+				</div>
+				<div class="row justify-content-md-center">
+					<img alt="" id="teaser" src="./resources/teaser.png" style="max-width: 375px;"/>
+				</div>
+			</div>
+		<h1 style="margin-top: 10px;">Abstract</h1>
+		</center>
+		<p>
+			Current work in modeling symbolic music primarily relies on representations extracted from MIDI-like data. While such formats allow for modeling symbolic music as sequences of notes, they omit the large space of symbolic annotations common in western sheet music broadly known as <em>expression text</em>, such as tempo or dynamics, which specify time- and velocity-dependent controls on the musical composition and performance. To alleviate this gap, we present <b>MusPyExpress</b>, an extension to the popular symbolic music processing library <a href="https://hermandong.com/muspy" target="_blank" rel="noopener noreferrer">MusPy</a> that enables the extraction of expression text along with symbolic music for downstream modeling. Utilizing this extension, we parse the <a href="https://pnlong.github.io/PDMX.demo/" target="_blank" rel="noopener noreferrer">PDMX dataset</a> to illustrate the wealth of expression text available in MusicXML datasets. Additionally, we introduce multiple generative tasks, including joint expression-note generation, expression-conditioned music generation, and expression tagging, that take advantage of this additional notational information.
+		</p>
+		<!-- end abstract and teaser image-->
+
+
+
+		<!-- video of a talk about your paper (youtube embedding) -->
+		<center><h1>Talk</h1></center>
+		<p align="center">
+			<iframe width="560" height="315" src="https://www.youtube.com/embed/ly36kn0ug4k" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>		</p>
+
+		<!-- Images -->
+		<hr id="images">
+		<center><h1 style="margin-top: 65px;">Some Images Demonstrating Your Paper</h1></center>
+		<p>Some explanation about the displayed images.<br>They can either be static</p>
+		
+		<!-- static images -->
+		<center>
+			<div class="container">
+				<div class="row justify-content-md-center">
+					<div class="col-md-auto" style="padding: 1px;">
+						<img alt="" src="./resources/image1.png" style="max-width: 375px;"/>
+					</div>
+					<div class="col-md-auto" style="padding: 1px;">
+						<img alt="" src="./resources/image2.png" style="max-width: 375px;"/>
+					</div>
+				</div>
+			</div>
+		</center>
+		<!-- end static images -->
+
+		<!-- images with drop down menu -->
+		<div class="container">
+			<p  style="margin-top: 35px;">
+			Or can be chosen from a dropdown menu, for some easy comparison between different methods for example 
+			</p>
+		</div>
+		<!-- dropdown -->
+		<center>
+		<div class="container">
+			<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 gy-3">
+				<div class="col">
+					<img alt="" id="dropdown1" class="round" src="./resources/dropdown/dropdown1/1.png" width="100%" style="padding-right: 2%; max-width:250px;"/>
+					<div class="btn-group my-btn" id="myDropdown">
+						<button type="button" onclick="document.getElementById('dropdown1').src='./resources/dropdown/dropdown1/1.png'" class="btn btn-info">Dropdown</button>
+						<button type="button" class="btn my-btn-info btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+							<span class="visually-hidden">Toggle Dropdown</span>
+						</button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown1').src='./resources/dropdown/dropdown1/2.png'">2</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown1').src='./resources/dropdown/dropdown1/3.png'">3</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown1').src='./resources/dropdown/dropdown1/4.png'">4</a></li>
+							<li><hr class="dropdown-divider"></li> 
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown1').src='./resources/dropdown/dropdown1/1.png'">1</a></li>
+						</ul>
+					</div>
+				</div>
+				<div class="col">
+					<img alt="" id="dropdown2" class="round" src="./resources/dropdown/dropdown2/1.png" width="100%" style="padding-right: 2%; max-width:250px;"/>
+					<div class="btn-group my-btn" id="myDropdown">
+						<button type="button" onclick="document.getElementById('dropdown2').src='./resources/dropdown/dropdown2/1.png'" class="btn btn-info">Dropdown</button>
+						<button type="button" class="btn my-btn-info btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+							<span class="visually-hidden">Toggle Dropdown</span>
+						</button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown2').src='./resources/dropdown/dropdown2/2.png'">2</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown2').src='./resources/dropdown/dropdown2/3.png'">3</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown2').src='./resources/dropdown/dropdown2/4.png'">4</a></li>
+							<li><hr class="dropdown-divider"></li> 
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown2').src='./resources/dropdown/dropdown2/1.png'">1</a></li>
+						</ul>
+					</div>
+				</div>
+				<div class="col">
+					<img alt="" id="dropdown3" class="round" src="./resources/dropdown/dropdown3/1.png" width="100%" style="padding-right: 2%; max-width:250px;"/>
+					<div class="btn-group my-btn" id="myDropdown">
+						<button type="button" onclick="document.getElementById('dropdown3').src='./resources/dropdown/dropdown3/1.png'" class="btn btn-info">Dropdown</button>
+						<button type="button" class="btn my-btn-info btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+							<span class="visually-hidden">Toggle Dropdown</span>
+						</button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown3').src='./resources/dropdown/dropdown3/2.png'">2</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown3').src='./resources/dropdown/dropdown3/3.png'">3</a></li>
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown3').src='./resources/dropdown/dropdown3/4.png'">4</a></li>
+							<li><hr class="dropdown-divider"></li> 
+							<li><a class="dropdown-item" onclick="document.getElementById('dropdown3').src='./resources/dropdown/dropdown3/1.png'">1</a></li>
+						</ul>
+					</div>
+				</div>
+		</div>
+		</center>
+		<!-- end images with dropdown menu -->
+
+		<!-- image carousel -->
+		<div class="container">
+			<p  style="margin-top: 35px;">
+			Using image carousel, images can be fading into each other automatically, or can be switched using arrows 
+			</p>
+		</div>
+		<div class="container">
+			<div class="row justify-content-md-center">
+				<!-- automatically fade -->
+				<div class="col-sm" style="max-width: 550px;">
+					<center>
+						<div id="carousel" class="carousel slide carousel-fade" data-bs-ride="carousel">
+							<div class="carousel-inner">
+							<div class="carousel-item active">
+								<img class="d-block" width="100%" src="./resources/carousel/1.jpg" style="max-width: 400px;">
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" width="100%" src="./resources/carousel/2.jpg" style="max-width: 400px;">
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" width="100%" src="./resources/carousel/3.jpg" style="max-width: 400px;">
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" width="100%" src="./resources/carousel/4.jpg" style="max-width: 400px;">
+							</div>
+							</div>
+						</div>
+					</center>
+				</div>
+				<!-- end automatically fade -->
+				<!-- arrows carousel -->
+				<div class="col-sm" style="max-width: 550px;">
+					<center>
+						<div id="myCarousel" class="carousel" data-ride="carousel" data-interval="false">
+							<ol class="carousel-indicators">
+							<li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+							<li data-target="#myCarousel" data-slide-to="1"></li>
+							<li data-target="#myCarousel" data-slide-to="2"></li>
+							<li data-target="#myCarousel" data-slide-to="3"></li>
+							</ol>
+							<div class="carousel-inner">
+							<div class="carousel-item active" >
+								<img class="d-block" src="./resources/carousel/1.jpg" style="max-width: 400px;">
+								<div class="carousel-caption d-none d-md-block">
+									<h5>Images can also have title</h5>
+									<p>and also text!</p>
+								  </div>
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" src="./resources/carousel/2.jpg" style="max-width: 400px;">
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" src="./resources/carousel/3.jpg" style="max-width: 400px;">
+							</div>
+							<div class="carousel-item">
+								<img class="d-block" src="./resources/carousel/4.jpg" style="max-width: 400px;">
+							</div>
+							</div>
+							<a class="carousel-control-prev" href="#myCarousel" role="button" data-slide="prev">
+								<i class="fa-solid fa-circle-left fa-2xl left-arrow"></i>
+							<span class="sr-only">Previous</span>
+							</a>
+							<a class="carousel-control-next" href="#myCarousel" role="button" data-slide="next">
+								<i class="fa-solid fa-circle-right fa-2xl right-arrow"></i>
+							<span class="sr-only">Next</span>
+							</a>
+						</div>
+					</center>
+				</div>
+				<!-- end arrows carousel -->
+			</div>
+		</div>
+		<!-- end image carousel -->
+		<!-- image slider -->
+		<div class="container">
+			<p  style="margin-top: 35px;">
+			Images can also be changes using an image slider 
+			</p>
+		</div>
+		<div class="container">
+			<div class="row justify-content-md-center">
+				<!-- first option for image slider -->
+				<div class="col-sm" style="max-width: 350px;">
+					<center>
+					<img src="./resources/dropdown/dropdown3/1.png" id="imgChange-dropdown3" style="max-width: 300px;">
+					<p id="txtChange-dropdown3" style="margin-top: 5px;">Image 1</p>
+					<input type="range" min="1" max="4" step="1" value="1" class="form-range custom-range" id="range-dropdown3" style="max-width: 300px;">
+					</center>
+				</div>
+				<!-- end first option for image slider -->
+				<!-- second option for image slider -->
+				<div class="col-sm" style="max-width: 350px;">
+					<center>
+					<div class="range-slider">
+						<img src="./resources/dropdown/dropdown2/1.png" id="imgChange-dropdown2" style="max-width: 300px;">
+						<input type="range" min="1" max="4" step="1" value="1" class="custom-range2" id="range-dropdown2" style="width: 300px; margin-top: 5px;" list="values">
+						<datalist id="values">
+							<option value="1"></option>
+							<option value="2"></option>
+							<option value="3"></option>
+							<option value="4"></option>
+						</datalist>
+						<div class="range-ticks" style="width: 300px;">
+							<span>First Image</span>
+							<span>Second Image</span>
+							<span>Third Image</span>
+							<span>Fourth Image</span>
+						</div>
+					</div>
+					</center>
+				</div>
+				<!-- end second option for image slider -->
+			</div>
+		</div>
+		<!-- end image slider -->
+
+		<!-- image overlay -->
+		<div class="container">
+			<p  style="margin-top: 35px;">
+			One can also using image overlay to show how an image is looked after editing, or use before and after slider  
+			</p>
+		</div>
+		<div class="container" style="margin-bottom: 70px;">
+			<div class="row justify-content-md-center">
+				<div class="col-sm" style="max-width: 350px;">
+					<center>
+						<div class="overlay-container">
+							<img src="./resources/dropdown/dropdown1/1.png" style="max-width: 300px;">
+							<div class="overlay-image">
+							  <img src="./resources/dropdown/dropdown1/3.png" style="max-width: 300px;">
+							  <p class="text-info">text describing the image</p>
+							</div>
+						  </div>	
+					</center>
+				</div>
+				<div class="col-sm" style="max-width: 350px;">
+					<center>
+						<div class="overlay-container">
+							<img src="./resources/dropdown/dropdown2/3.png" style="max-width: 300px;">
+							<div class="overlay-image-2">
+							  <img src="./resources/dropdown/dropdown2/4.png" style="max-width: 300px; opacity: 0.5 !important;">
+							  <p class="text-info" style="opacity: 1 !important;">this overlay image has opacity smaller than 1</p>
+							</div>
+						  </div>
+					</center>					  
+				</div>
+				<!-- before and after image slider -->
+				<div class="col-sm" style="max-width: 350px;">
+					<center>
+						<div class="container-ba-slider">
+							<div class="before">
+							  <img src="./resources/dropdown/dropdown2/2.png" draggable="false" style="max-width: 300px;"/> 
+							</div>
+							<div class="after">
+							  <img src="./resources/carousel/2.jpg" draggable="false" style="max-width: 300px;"/>
+							</div>
+							<div class="scroller">
+								<svg class="scroller-thumb" xmlns="http://www.w3.org/2000/svg" height="2em" viewBox="0 0 512 512">
+									<style>svg{fill:#62dbff}</style>
+									<path d="M504.3 273.6c4.9-4.5 7.7-10.9 7.7-17.6s-2.8-13-7.7-17.6l-112-104c-7-6.5-17.2-8.2-25.9-4.4s-14.4 12.5-14.4 22l0 56-192 0 0-56c0-9.5-5.7-18.2-14.4-22s-18.9-2.1-25.9 4.4l-112 104C2.8 243 0 249.3 0 256s2.8 13 7.7 17.6l112 104c7 6.5 17.2 8.2 25.9 4.4s14.4-12.5 14.4-22l0-56 192 0 0 56c0 9.5 5.7 18.2 14.4 22s18.9 2.1 25.9-4.4l112-104z"/>
+								</svg>
+							</div>
+						  </div>
+					</center>					  
+				</div>
+				<!-- end before and after image slider -->
+			</div>  
+		</div>
+		<!-- end image overlay -->
+
+		<!-- end Images -->
+
+		<!-- Audio -->
+		<hr id="audio">
+		<center><h1 style="margin-top: 65px;">Some Audio Files Demonstrating Your Paper</h1></center>
+		<p>The above can also also be applied for different content sources, as audio</p>
+		<center>
+			<div class="container">
+				<div class="row justify-content-md-center">
+					<!-- dropdown audio -->
+					<div class="col-sm">
+						<audio controls id="dropdown_audio">
+							<source src="./resources/audio/audio1.mp4" type="audio/mp4">
+						  </audio>
+						<div class="btn-group my-btn" id="myAudioDropdown">
+							<button type="button" onclick="document.getElementById('dropdown_audio').src='./resources/audio/audio1.mp4'" class="btn btn-info">Dropdown</button>
+							<button type="button" class="btn my-btn-info btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+								<span class="visually-hidden">Toggle Dropdown</span>
+							</button>
+							<ul class="dropdown-menu">
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_audio').src='./resources/audio/audio2.mp4'">2</a></li>
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_audio').src='./resources/audio/audio3.mp4'">3</a></li>
+								<li><hr class="dropdown-divider"></li> 
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_audio').src='./resources/audio/audio1.mp4'">1</a></li>
+							</ul>
+						</div>
+					</div>
+					<!-- end dropdown audio -->
+					<!-- audio carousel -->
+					<div class="col-sm" style="max-width: 550px;">
+							<center>
+								<div id="myAudioCarousel" class="carousel" data-ride="carousel" data-interval="false">
+									<ol class="carousel-indicators audio-carousel-indicators">
+									<li data-target="#myAudioCarousel" data-slide-to="0" class="active"></li>
+									<li data-target="#myAudioCarousel" data-slide-to="1"></li>
+									<li data-target="#myAudioCarousel" data-slide-to="2"></li>
+									</ol>
+									<div class="carousel-inner">
+									<div class="carousel-item active" >
+										<audio controls>
+											<source src="./resources/audio/audio1.mp4" type="audio/mp4">
+										  </audio>
+										  <div class="position-relative text-center">
+											text describing the audio file
+										  </div>
+									</div>
+									<div class="carousel-item">
+										<audio controls>
+											<source src="./resources/audio/audio2.mp4" type="audio/mp4">
+										  </audio>
+										  <div class="position-relative text-center">
+											which changes
+										  </div>
+									</div>
+									<div class="carousel-item">
+										<audio controls>
+											<source src="./resources/audio/audio3.mp4" type="audio/mp4">
+										  </audio>
+										  <div class="position-relative text-center">
+											on click	
+										  </div>
+									</div>
+									</div>
+									<a class="carousel-control-prev" href="#myAudioCarousel" role="button" data-slide="prev">
+										<i class="fa-solid fa-circle-left fa-2xl left-arrow"></i>
+									<span class="sr-only">Previous</span>
+									</a>
+									<a class="carousel-control-next" href="#myAudioCarousel" role="button" data-slide="next">
+										<i class="fa-solid fa-circle-right fa-2xl right-arrow"></i>
+									<span class="sr-only">Next</span>
+									</a>
+								</div>
+							</center>
+					</div>
+					<!-- end audio carousel -->
+					</div>
+			</div>
+			</center>
+		<br>
+		<!-- end Audio -->
+
+		<!-- Video -->
+		<hr id="video">
+		<center><h1 style="margin-top: 65px;">Some Video Demonstrating Your Paper</h1></center>
+		<p>or video</p>
+		<center>
+			<div class="container">
+				<div class="row justify-content-md-center">
+					<!-- video dropdown -->
+					<div class="col-sm" style="max-width: 550px;">
+						<video controls id="dropdown_video">
+							<source src="./resources/video/video1.mp4" type="video/mp4">
+							</video>
+						<div class="btn-group my-btn" id="myVideoDropdown">
+							<button type="button" onclick="document.getElementById('dropdown_video').src='./resources/video/video1.mp4'" class="btn btn-info">Dropdown</button>
+							<button type="button" class="btn my-btn-info btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+								<span class="visually-hidden">Toggle Dropdown</span>
+							</button>
+							<ul class="dropdown-menu">
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_video').src='./resources/video/video2.mp4'">2</a></li>
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_video').src='./resources/video/video3.mp4'">3</a></li>
+								<li><hr class="dropdown-divider"></li> 
+								<li><a class="dropdown-item" onclick="document.getElementById('dropdown_video').src='./resources/video/video1.mp4'">1</a></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<!-- end video dropdown -->
+
+				<!-- video carousel -->
+				<div class="row justify-content-md-center" style="margin-top: 25px;">
+					<div class="col-sm" style="max-width: 750px;">
+						<center>
+							<div id="myVideoCarousel" class="carousel" data-ride="carousel" data-interval="false">
+								<ol class="carousel-indicators audio-carousel-indicators">
+								<li data-target="#myVideoCarousel" data-slide-to="0" class="active"></li>
+								<li data-target="#myVideoCarousel" data-slide-to="1"></li>
+								<li data-target="#myVideoCarousel" data-slide-to="2"></li>
+								</ol>
+								<div class="carousel-inner">
+								<div class="carousel-item active" >
+									<video controls id="dropdown_video">
+										<source src="./resources/video/video1.mp4" type="video/mp4">
+										</video>
+									<p>some text describing</p>
+								</div>
+								<div class="carousel-item">
+									<video controls id="dropdown_video">
+										<source src="./resources/video/video2.mp4" type="video/mp4">
+										</video>
+									<p>the video</p>
+								</div>
+								<div class="carousel-item">
+									<video controls id="dropdown_video">
+										<source src="./resources/video/video3.mp4" type="video/mp4">
+										</video>
+								</div>
+								</div>
+								<a class="carousel-control-prev" href="#myVideoCarousel" role="button" data-slide="prev">
+									<i class="fa-solid fa-circle-left fa-2xl left-arrow"></i>
+								<span class="sr-only">Previous</span>
+								</a>
+								<a class="carousel-control-next" href="#myVideoCarousel" role="button" data-slide="next">
+									<i class="fa-solid fa-circle-right fa-2xl right-arrow"></i>
+								<span class="sr-only">Next</span>
+								</a>
+							</div>
+						</center>
+					</div>	
+				</div>
+				<!-- end video carousel -->
+				<!-- video overlay -->
+				<div class="row justify-content-md-center" style="margin-top: 50px;">
+					<div class="col-sm" style="max-width: 750px;">
+						<center>
+							<div class="overlay-container">
+								<video playsinline autoplay muted loop>
+									<source src="./resources/video/video3.mp4" type="video/mp4">
+								</video>
+								<div class="overlay-video">
+									<video playsinline autoplay muted loop>
+										<source src="./resources/video/video2.mp4" type="video/mp4">
+									</video>
+									<p class="text-info">a text describing the overlay video</p>
+								</div>
+							</div>	
+						</center>
+					</div>
+				</div>
+				<!-- end video overlay -->
+			</div>
+			</center>
+		<br>
+		<!-- end Video -->
+
+
+
+
+
+		<!-- PAPER LINKS -->
+		<hr id="paper">
+		<div class="container">
+			<center><h1 style="margin-top: 65px;">Paper</h1></center>
+			<div class="row justify-content-md-center">
+				<div class="col-md-auto" style="padding: 1px;">
+					<a href='resources/paper.pdf' target="_blank" rel="noopener noreferrer">
+						<img alt="" class="layered-paper-big" style="height:100%; max-height: 175px;" src="./resources/paper.png"/>
+					</a>
+					<a href='resources/paper.pdf' target="_blank" rel="noopener noreferrer">
+						<img alt="" class="layered-paper" style="height:100%; max-height: 175px;" src="./resources/paper.png"/>
+					</a>
+					<a href='resources/paper.pdf' target="_blank" rel="noopener noreferrer">
+						<img alt="" class="paper-big" style="height:100%; max-height: 175px;" src="./resources/paper.png"/>
+					</a>
+				</div>
+				<div class="col-md-auto" style="padding: 1px;">
+					<p style="font-size:14pt; margin-top: 5px;"><strong>MusPyExpress: Extending MusPy with Enhanced Expression Text Support</strong><br>
+						Phillip Long, Hao-Wen Dong, Julian McAuley, Zachary Novack.<br>
+						<!-- <span><a class="btn btn-outline-primary" href='https://arxiv.org' role="button" style="font-size: 16px;"><i class="ai ai-arxiv"></i> Arxiv</a></span> -->
+						<span><a class="btn btn-outline-primary" href='resources/paper.pdf' role="button" style="font-size: 16px;"><i class="fas fa-file-pdf"></i> Paper</a></span>
+					</p>
+				</div>
+			</div>
+		</div>
+
+
+
+		<!-- BIBTEX CITATION -->
+		<p class="section" id="bibtex"><b>Bibtex</b></p>
+		<table border="0">
+		<tbody>
+			<pre class="command-copy"><div class="container"><div class="row"><div class="col" id="citation">
+@inproceedings{long2025muspyexpress,
+	title={MusPyExpress: Extending MusPy with Enhanced Expression Text Support},
+	author={Long, Phillip and Dong, Hao-Wen and McAuley, Julian and Novack, Zachary},
+	booktitle={NeurIPS 2025 Workshop on AI for Music: Where Creativity Meets Computation},
+	year={2025},
+	<!-- url={https://openreview.net/} -->
+}
+		</div><div class="col text-end"><button type="button" class="btn btn-light" onclick="copyBib()" onmouseover="console.log('hover');"><i class="fa-regular fa-copy"></i></button></div></div></div></pre>
+		</tbody>
+		</table>
+		<!-- end bibtex citation -->
+
+
+
+
+		<!-- SUPPLEMENTARY MATERIAL AND CODE -->
+		<div class="container">
+			<p class="text-left">
+				The <a href="https://github.com/salu133445/muspy/tree/expressive" target="_blank" rel="noopener noreferrer">official MusPyExpress implementation</a> can be found on the <code>expressive</code> branch of the MusPy repository.<br>
+				We also make <a href="https://github.com/pnlong/muspy_express" target="_blank" rel="noopener noreferrer">all supporting code</a> (i.e., experiments, tables, and figures) available for reference and reproducibility.<br>
+				Lastly, we provide extensive <a href="" target="_blank" rel="noopener noreferrer">documentation</a> for the MusPyExpress extension.
+			</p>
+		</div>
+		
+
+		<center>
+			<table class="table" width="1" style="max-width: 400px;">
+				<tbody>
+					<tr>
+						<!-- <td width="50%" style="text-align: center;">
+							<a target="_blank" rel="noopener noreferrer" href="resources/supp.pdf" style="color:black !important;">
+								<img alt="" id="supp" class="round" width="100%" style="max-width:150px" border="1px solid" src="./resources/supp.png"/>
+							</a>
+						</td> -->
+						<td width="50%" style="text-align: center;">
+							<a href="https://github.com" target="_blank" rel="noopener noreferrer">
+								<img alt="" id="github_logo" class="round" width="100%" style="max-width:150px" src="./resources/github_logo.png"/>
+							</a>
+						</td>
+						<td width="50%" style="text-align: center;">
+							<a href="https://github.com" target="_blank" rel="noopener noreferrer">
+								<img alt="" id="github_logo" class="round" width="100%" style="max-width:150px" src="./resources/github_logo.png"/>
+							</a>
+						</td>
+						<td width="50%" style="text-align: center;">
+							<a href="https://github.com" target="_blank" rel="noopener noreferrer">
+								<img alt="" id="github_logo" class="round" width="100%" style="max-width:150px" src="./resources/github_logo.png"/>
+							</a>
+						</td>
+					</tr>
+					<tr>
+						<!-- <td style="font-size:14pt; text-align: center;"
+							<span><a class="btn btn-outline-primary" href='resources/supp.pdf' role="button" style="font-size: 16px;">Supplementary</a></span>
+						</td> -->
+						<td style="font-size:14pt; text-align: center;">
+							<span><a class="btn btn-outline-primary" href='https://github.com/salu133445/muspy/tree/expressive' role="button" style="font-size: 16px;">Official Implementation</a></span>
+						</td>
+						<td style="font-size:14pt; text-align: center;">
+							<span><a class="btn btn-outline-primary" href='https://github.com/pnlong/muspy_express' role="button" style="font-size: 16px;">Supporting Code</a></span>
+						</td>
+						<td style="font-size:14pt; text-align: center;">
+							<span><a class="btn btn-outline-primary" href='' role="button" style="font-size: 16px;">Documentation</a></span>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</center>
+
+		<hr>
+		<br>
+
+	<br>
+
+</div>
+
+<script src="functionality.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+</body>
+</html>
+
