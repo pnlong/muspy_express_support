@@ -28,6 +28,7 @@
 			</button>
 			<div class="collapse navbar-collapse" id="main_nav">
 			<ul class="navbar-nav ms-auto">
+				<li class="nav-item"><a class="nav-link" href="#overview">Overview</a></li>
 				<li class="nav-item"><a class="nav-link" href="#joint">Joint</a></li>
 				<li class="nav-item"><a class="nav-link" href="#conditional">Expression-Conditioned</a></li>
 				<li class="nav-item"><a class="nav-link" href="#econditional">Expression Tagging</a></li>
@@ -132,9 +133,8 @@
 
 
 		<!-- OVERVIEW -->
-		<center>
-			<h1 style="margin-top: 10px;">Overview</h1>
-		</center>
+		<hr id="overview">
+		<center><h1 style="margin-top: 10px;">Overview</h1></center>
 		<p>
 			We present three generative tasks enabled by the additional expression text information extracted by MusPyExpress (the latter two of which we refer to as <em>conditional</em> tasks): <a href="#joint"></a>joint expression-note generation</a>, <a href="#conditional">expression-conditioned note generation</a>, and <a href="#econditional">expression tagging</a>. We describe the details of our experiments at length in Appendix C of our <a href="#paper">paper</a>, but we provide an overview here.
 		</p>
@@ -324,6 +324,13 @@
 			</div>  
 		</div>
 
+
+
+
+
+		<!-- ANTICIPATORY CONDITIONING -->
+		<h2 style="margin-top: 35px;">Anticipatory Conditioning</h2>
+
 	
 
 
@@ -332,7 +339,7 @@
 
 
 
-		
+				
 
 
 		<!-- EXPRESSION-CONDITIONED -->
@@ -340,7 +347,7 @@
 		<center><h1 style="margin-top: 65px;">Expression-Conditioned Note Generation</h1></center>
 		<div class="container">
 			<p  style="margin-top: 25px;">
-				We modify the standard symbolic music generation task with expression text annotations <i>p<sub>&theta;</sub>(<b>n</b> | <b>e</b>)</i>, learning a model to produce notes <i>given</i> a sequence of expression text tokens. This task could prove useful in film music generation and sound design for games and audiobooks, where it is often useful to match music to the climax, tension, and rhythm of the inputs.
+				We modify the standard symbolic music generation task with expression text annotations <i>p<sub>&theta;</sub>(<b>n</b> </i>|<i> <b>e</b>)</i>, learning a model to produce notes <i>given</i> a sequence of expression text tokens. This task could prove useful in film music generation and sound design for games and audiobooks, where it is often useful to match music to the climax, tension, and rhythm of the inputs.
 			</p>
 		</div>
 
@@ -349,6 +356,16 @@
 
 
 
+		<!-- PREFIX CONDITIONING -->
+		<h2 style="margin-top: 35px;">Prefix Conditioning</h2>
+
+
+
+
+
+
+		<!-- ANTICIPATORY CONDITIONING -->
+		<h2 style="margin-top: 35px;">Anticipatory Conditioning</h2>
 
 
 
@@ -362,13 +379,23 @@
 		<center><h1 style="margin-top: 65px;">Expression Tagging</h1></center>
 		<div class="container">
 			<p  style="margin-top: 25px;">
-				Given an existing note sequence <i><b>n</b></i>, we learn a model <i>p<sub>&theta;</sub>(<b>e</b> | <b>n</b>)</i> that tags the sequence with expression text <i><b>e</b></i> (i.e. add expression text to a planned musical score). This task serves as an intermediate step in the MIDI to performance rendering of a musical score; given only a plain MIDI file, a trained model could suggest appropriate expression markings such as <em>legato</em>, <em>crescendo</em>, or <em>dolce</em>, enabling automatic annotation of extensive collections of unexpressive MIDI data widely available in large-scale MIDI datasets.
+				Given an existing note sequence <i><b>n</b></i>, we learn a model <i>p<sub>&theta;</sub>(<b>e</b> </i>|<i> <b>n</b>)</i> that tags the sequence with expression text <i><b>e</b></i> (i.e. add expression text to a planned musical score). This task serves as an intermediate step in the MIDI to performance rendering of a musical score; given only a plain MIDI file, a trained model could suggest appropriate expression markings such as <em>legato</em>, <em>crescendo</em>, or <em>dolce</em>, enabling automatic annotation of extensive collections of unexpressive MIDI data widely available in large-scale MIDI datasets.
 			</p>
 		</div>
 
 
 
 
+
+		<!-- PREFIX CONDITIONING -->
+		<h2 style="margin-top: 35px;">Prefix Conditioning</h2>
+
+
+
+
+
+		<!-- ANTICIPATORY CONDITIONING -->
+		<h2 style="margin-top: 35px;">Anticipatory Conditioning</h2>
 
 
 
@@ -489,7 +516,7 @@
 				<sup id="cite_muspy">[1]</sup> Hao-Wen Dong, Ke Chen, Julian McAuley, and Taylor Berg-Kirkpatrick. Muspy: A toolkit for symbolic music generation. In <i>Proceedings of the 21st International Society for Music Information Retrieval Conference (ISMIR)</i>, 2020.<br><br>
 				<sup id="cite_pdmx1">[2]</sup> Phillip Long, Zachary Novack, Taylor Berg-Kirkpatrick, and Julian McAuley. PDMX: A large-scale public domain musicxml dataset for symbolic music processing. In <i>ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)</i>, 2025.<br><br>
 				<sup id="cite_pdmx2">[3]</sup> Weihan Xu, Julian McAuley, Taylor Berg-Kirkpatrick, Shlomo Dubnov, and Hao-Wen Dong. Generating symbolic music from natural language prompts using an llm-enhanced dataset. <i>arXiv preprint arXiv:2410.02084</i>, 2024.<br><br>
-				<sup id="cite_amt">[4]</sup> John Thickstun, David Hall, Chris Donahue, and Percy Liang. Anticipatory music transformer. <i>arXiv preprint arXiv:2306.08620</i>, 2023.
+				<sup id="cite_amt">[4]</sup> John Thickstun, David Hall, Chris Donahue, and Percy Liang. Anticipatory music transformer. <i>arXiv preprint arXiv:2306.08620</i>, 2023.<br>
 			</p>
 		</div>
 
