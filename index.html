@@ -32,6 +32,7 @@
 				<li class="nav-item"><a class="nav-link" href="#conditional">Expression-Conditioned</a></li>
 				<li class="nav-item"><a class="nav-link" href="#econditional">Expression-Tagging</a></li>
 				<li class="nav-item"><a class="nav-link" href="#paper">Paper</a></li>
+				<li class="nav-item"><a class="nav-link" href="#references">References</a></li>
 			</ul>
 			</div> 
 		</div> 
@@ -124,14 +125,16 @@
 		<h1 style="margin-top: 10px;">Abstract</h1>
 		</center>
 		<p>
-			Current work in modeling symbolic music primarily relies on representations extracted from MIDI-like data. While such formats allow for modeling symbolic music as sequences of notes, they omit the large space of symbolic annotations common in western sheet music broadly known as <em>expression text</em>, such as tempo or dynamics, which specify time- and velocity-dependent controls on the musical composition and performance. To alleviate this gap, we present <b>MusPyExpress</b>, an extension to the popular symbolic music processing library <a href="https://hermandong.com/muspy" target="_blank" rel="noopener noreferrer">MusPy</a> <sup>[<a class="nav-link" href="#cite_muspy">1</a>]</sup> that enables the extraction of expression text along with symbolic music for downstream modeling. Utilizing this extension, we parse the <a class="nav-link" href="https://pnlong.github.io/PDMX.demo/" target="_blank" rel="noopener noreferrer">PDMX dataset</a> <sup>[<a class="nav-link" href="#cite_pdmx1">2</a>,<a href="#cite_pdmx2">3</a>]</sup> to illustrate the wealth of expression text available in MusicXML datasets. Additionally, we introduce multiple generative tasks, including joint expression-note generation, expression-conditioned music generation, and expression tagging, that take advantage of this additional notational information.
+			Current work in modeling symbolic music primarily relies on representations extracted from MIDI-like data. While such formats allow for modeling symbolic music as sequences of notes, they omit the large space of symbolic annotations common in western sheet music broadly known as <em>expression text</em>, such as tempo or dynamics, which specify time- and velocity-dependent controls on the musical composition and performance. To alleviate this gap, we present <b>MusPyExpress</b>, an extension to the popular symbolic music processing library <a href="https://hermandong.com/muspy" target="_blank" rel="noopener noreferrer">MusPy</a> <sup>[<a href="#cite_muspy">1</a>]</sup> that enables the extraction of expression text along with symbolic music for downstream modeling. Utilizing this extension, we parse the <a href="https://pnlong.github.io/PDMX.demo/" target="_blank" rel="noopener noreferrer">PDMX dataset</a> <sup>[<a href="#cite_pdmx1">2</a>,<a href="#cite_pdmx2">3</a>]</sup> to illustrate the wealth of expression text available in MusicXML datasets. Additionally, we introduce multiple generative tasks, including joint expression-note generation, expression-conditioned music generation, and expression tagging, that take advantage of this additional notational information.
 		</p>
 		<!-- end abstract and teaser image-->
 
 
 
 		<!-- OVERVIEW -->
-		<h1 style="margin-top: 10px;">Overview</h1>
+		<center>
+			<h1 style="margin-top: 10px;">Overview</h1>
+		</center>
 		<p>
 			To be completed.
 		</p>
@@ -464,13 +467,13 @@
 
 		<!-- REFERENCES -->
 		<hr id="references">
-		<center><h1 style="margin-top: 65px;">References</h1></center>
+		<center><h1 style="margin-top: 65px; margin-bottom: 25px;">References</h1></center>
 		<div class="container">
-			<p class="text-left">
-				<sup id="cite_muspy">[1]</sup>Hao-Wen Dong, Ke Chen, Julian McAuley, and Taylor Berg-Kirkpatrick. Muspy: A toolkit for symbolic music generation. <i>arXiv preprint arXiv:2008.01951</i>, 2020.<br>
-				<sup id="cite_pdmx1">[2]</sup>Phillip Long, Zachary Novack, Taylor Berg-Kirkpatrick, and Julian McAuley. PDMX: A large-scale public domain musicxml dataset for symbolic music processing. In <i>ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)</i>, pages 1-5, 2025.<br>
-				<sup id="cite_pdmx2">[3]</sup>Weihan Xu, Julian McAuley, Taylor Berg-Kirkpatrick, Shlomo Dubnov, and Hao-Wen Dong. Generating symbolic music from natural language prompts using an llm-enhanced dataset. <i>arXiv preprint arXiv:2410.02084</i>, 2024.<br>
-				<sup id="cite_amt">[4]</sup>John Thickstun, David Hall, Chris Donahue, and Percy Liang. Anticipatory music transformer. <i>arXiv preprint arXiv:2306.08620</i>, 2023.
+			<p class="text-left" style="line-height: 1.5;">
+				<sup id="cite_muspy">[1]</sup> Hao-Wen Dong, Ke Chen, Julian McAuley, and Taylor Berg-Kirkpatrick. Muspy: A toolkit for symbolic music generation. <i>arXiv preprint arXiv:2008.01951</i>, 2020.<br>
+				<sup id="cite_pdmx1">[2]</sup> Phillip Long, Zachary Novack, Taylor Berg-Kirkpatrick, and Julian McAuley. PDMX: A large-scale public domain musicxml dataset for symbolic music processing. In <i>ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)</i>, pages 1-5, 2025.<br>
+				<sup id="cite_pdmx2">[3]</sup> Weihan Xu, Julian McAuley, Taylor Berg-Kirkpatrick, Shlomo Dubnov, and Hao-Wen Dong. Generating symbolic music from natural language prompts using an llm-enhanced dataset. <i>arXiv preprint arXiv:2410.02084</i>, 2024.<br>
+				<sup id="cite_amt">[4]</sup> John Thickstun, David Hall, Chris Donahue, and Percy Liang. Anticipatory music transformer. <i>arXiv preprint arXiv:2306.08620</i>, 2023.
 			</p>
 		</div>
 
@@ -479,7 +482,7 @@
 
 
 
-
+		<hr>
 		<br>
 
 	<br>
