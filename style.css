@@ -340,3 +340,39 @@ td {
   vertical-align: middle !important;
 }
 
+
+/* heading spacing helpers */
+.section-title {
+  margin-top: 65px;
+}
+
+.section-subtitle {
+  margin-top: 25px;
+}
+
+/* subsection and main text spacing */
+.section-subsection {
+  margin-top: 20px;
+  /* margin-bottom: 20px; */
+}
+
+.section-main-text {
+  margin-top: 20px;
+}
+
+/* subsection content container spacing */
+.section-subsection-content {
+  margin-bottom: 0px;
+}
+
+/* explicit hooks for margins on specific subsection columns */
+.image-slider-margins {
+  margin-top: 20px;
+  max-width: 350px;
+}
+
+.audio-carousel-margins {
+  margin-top: 10px;
+  max-width: 550px;
+}
+
