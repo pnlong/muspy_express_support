@@ -362,7 +362,8 @@ td {
 
 /* subsection content container spacing */
 .section-subsection-content {
-  margin-bottom: 0px;
+  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 /* explicit hooks for margins on specific subsection columns */
@@ -372,7 +373,7 @@ td {
 }
 
 .audio-carousel-margins {
-  margin-top: 10px;
+  margin-top: 20px;
   max-width: 550px;
 }
 
