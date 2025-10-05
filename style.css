@@ -325,11 +325,6 @@ td {
   background: #fff;
 }
 
-/* Support Code GitHub icons opacity */
-.support-code-opacity {
-  opacity: 0.8 !important;
-}
-
 /* Equal width table columns */
 .equal-width-table {
   table-layout: fixed !important;
