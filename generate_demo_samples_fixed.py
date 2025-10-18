@@ -908,6 +908,16 @@ if __name__ == "__main__":
         model_output_dir = f"{output_base_dir}/{model_name}"
         if not exists(model_output_dir):
             makedirs(model_output_dir)
+
+        # check if model output directory already exists and skip if n_samples have already been generated
+        n_samples_already_generated = len(os.listdir(model_output_dir)) if exists(model_output_dir) else 0
+        if not args.reset and n_samples_already_generated >= args.n_samples:
+            model_results[model_name]["total_processed"] = n_samples_already_generated
+            model_results[model_name]["total_successful"] = n_samples_already_generated
+            logging.info(f"Skipping because {n_samples_already_generated} samples already exist")
+            logging.info(f"Model {model_name}: Processed {model_results[model_name]['total_successful']}/{model_results[model_name]['total_processed']} samples successfully")
+            logging.info(LINE)
+            continue
         
         # load model-specific training arguments
         model_train_args_filepath = f"{experiment_dir}/models/{model_name}/train_args.json"
