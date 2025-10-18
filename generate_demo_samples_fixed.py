@@ -823,11 +823,11 @@ if __name__ == "__main__":
         makedirs(output_base_dir)
 
     # set up the logger
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(
-        level = log_level,
-        format = "%(message)s",
-        handlers = [logging.StreamHandler(stream = sys.stdout), logging.FileHandler(filename = f"{output_base_dir}/generation.log", mode = "w")])
+    stream_handler = logging.StreamHandler(stream = sys.stdout)
+    stream_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
+    file_handler = logging.FileHandler(filename = f"{output_base_dir}/generation.log", mode = "w")
+    file_handler.setLevel(logging.DEBUG)
+    logging.basicConfig(level = logging.DEBUG, format = "%(message)s", handlers = [stream_handler, file_handler])
     
     if args.debug:
         logging.info("Debug logging enabled - this will provide detailed information about processing steps")
