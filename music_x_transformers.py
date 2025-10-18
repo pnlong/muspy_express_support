@@ -39,6 +39,7 @@ from dataset import PAD_VALUE
 
 DEFAULT_IGNORE_INDEX = -100
 MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT = 5 # max number of tokens that can build up at final timestep before end of song token can be placed
+MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT_PREFIX = 50 # higher limit for prefix models since they don't have interleaved controls
 MAX_LOSS = 100.0 # for loss clipping, make None to turn off
 
 ##################################################
@@ -418,9 +419,17 @@ class MusicAutoregressiveWrapper(nn.Module):
         start_tokens_per_seq = [torch.repeat_interleave(input = ~torch.all(input = ((seq.reshape(int(len(seq) / self.net.n_tokens_per_event), self.net.n_tokens_per_event) if self.net.unidimensional else seq) == self.pad_value), dim = -1), repeats = self.net.n_tokens_per_event, dim = -1) for seq in start_tokens]
         # ensure that we aren't accidentally masking out the sos row
         if (self.pad_value == self.sos_type_code) and (not self.net.unidimensional): # does not apply to unidimensional because sos row isn't all 0s in unidimensional scheme
-            first_sos_token_index = torch.argmax(input = torch.stack(tensors = start_tokens_per_seq, dim = 0).byte(), dim = -1) - self.net.n_tokens_per_event # length of this is batch_size
-            for seq_index in range(batch_size):
-                start_tokens_per_seq[seq_index][first_sos_token_index[seq_index]] = True
+            # Check if start_tokens_per_seq is empty to avoid IndexError
+            stacked_tokens = torch.stack(tensors = start_tokens_per_seq, dim = 0).byte()
+            if stacked_tokens.shape[1] > 0:  # Check if dimension 1 has non-zero size
+                first_sos_token_index = torch.argmax(input = stacked_tokens, dim = -1) - self.net.n_tokens_per_event # length of this is batch_size
+                for seq_index in range(batch_size):
+                    start_tokens_per_seq[seq_index][first_sos_token_index[seq_index]] = True
+            else:
+                # If all sequences are empty, add SOS token at the beginning
+                for seq_index in range(batch_size):
+                    if len(start_tokens_per_seq[seq_index]) > 0:
+                        start_tokens_per_seq[seq_index][0] = True
         # remove front pad from start tokens
         start_tokens_unpadded = [seq[start_token_per_seq].unsqueeze(dim = 0) for seq, start_token_per_seq in zip(start_tokens, start_tokens_per_seq)]
         if self.net.unidimensional: # get the eos tokens for unidimensionality
@@ -635,9 +644,18 @@ class MusicAutoregressiveWrapper(nn.Module):
                         logits_to_return.append(logits)                    
 
                 # to avoid buildup of tokens at max temporal, end song
-                exceeds_max_temporal_token_buildup_limit = (max_temporal_token_buildup >= MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT) # len(max_temporal_token_buildup) == batch_size
+                # Use higher limit for prefix models since they don't have interleaved controls
+                buildup_limit = MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT_PREFIX if not is_anticipation else MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT
+                exceeds_max_temporal_token_buildup_limit = (max_temporal_token_buildup >= buildup_limit) # len(max_temporal_token_buildup) == batch_size
+                
+                # Debug: Log temporal token buildup
+                if i % 100 == 0 or torch.any(exceeds_max_temporal_token_buildup_limit):  # Log every 100 iterations or when limit exceeded
+                    print(f"Generation iteration {i}/{n_iterations}: max_temporal_token_buildup = {max_temporal_token_buildup.tolist()}, limit = {buildup_limit}")
+                    print(f"  exceeds_limit = {exceeds_max_temporal_token_buildup_limit.tolist()}")
+                
                 if exists(eos_token) and (i == final_iteration_index): # force all eos tokens if on the final iteration of generating
                     exceeds_max_temporal_token_buildup_limit = torch.ones_like(input = exceeds_max_temporal_token_buildup_limit, dtype = torch.bool).to(output.device)
+                    print(f"Final iteration {i}: forcing EOS for all sequences")
                 max_temporal_token_buildup_limit_mask = torch.repeat_interleave(input = (~exceeds_max_temporal_token_buildup_limit).unsqueeze(dim = -1), repeats = self.net.n_tokens_per_event, dim = -1) # if the number of tokens exceeds or equals the buildup limit, zero out the row
                 batch_event *= max_temporal_token_buildup_limit_mask.byte() # zero out sequences in the batch that exceed the buildup limit
                 batch_event += (~max_temporal_token_buildup_limit_mask).byte() * eos_tokens # make rows match sos rows (type dim followed by all 0s)
@@ -730,7 +748,9 @@ class MusicAutoregressiveWrapper(nn.Module):
                 for seq_index, event_type in enumerate(event_types): # seq_index is the sequence index within the batch
 
                     # to avoid buildup of tokens at max temporal, end song
-                    if (max_temporal_token_buildup[seq_index].item() >= MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT) or (i == final_iteration_index): # if the number of tokens exceeds or equals the buildup limit, place end of song token
+                    # Use higher limit for prefix models since they don't have interleaved controls
+                    buildup_limit = MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT_PREFIX if not is_anticipation else MAX_TEMPORAL_TOKEN_BUILDUP_LIMIT
+                    if (max_temporal_token_buildup[seq_index].item() >= buildup_limit) or (i == final_iteration_index): # if the number of tokens exceeds or equals the buildup limit, place end of song token
                         event_type = self.eos_type_code
                         batch_event[seq_index, :, self.type_dim] = self.eos_type_code
 

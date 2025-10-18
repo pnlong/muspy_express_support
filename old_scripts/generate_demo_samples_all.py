@@ -15,9 +15,10 @@ import logging
 import pprint
 import sys
 from os.path import exists, dirname, basename
-from os import makedirs, get_terminal_size
+from os import makedirs
 from typing import Callable, Tuple
 import multiprocessing
+from shutil import rmtree
 
 import numpy as np
 import torch
@@ -51,7 +52,7 @@ CONDITIONAL_TYPES = train.MASKS
 GENERATION_TYPES = train.MASKS
 EVAL_TYPES = ["joint",] + [f"conditional_{conditional_type}_{generation_type}" for conditional_type in CONDITIONAL_TYPES for generation_type in GENERATION_TYPES]
 
-LINE = "-" * get_terminal_size().columns
+LINE = "-" * 60
 
 ##################################################
 
@@ -74,6 +75,8 @@ def parse_args(args = None, namespace = None):
     parser.add_argument("-bs", "--batch_size", default = 8, type = int, help = "Batch size")
     parser.add_argument("-g", "--gpu", type = int, help = "GPU number")
     parser.add_argument("-j", "--jobs", default = 4, type = int, help = "Number of jobs")
+    parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
+    parser.add_argument("--debug", action = "store_true", help = "Enable debug logging for troubleshooting.")
     return parser.parse_args(args = args, namespace = namespace)
 ##################################################
 
@@ -137,18 +140,88 @@ def write_music_files(
         mxl_filepath = f"{output_dir}/{prefix}.mxl"
         
         # Check if all files exist and skip if requested
-        if skip_existing and all(exists(fp) for fp in [wav_filepath, midi_filepath, mxl_filepath]):
+        # Note: We check for MusicXML separately since it might be skipped due to tempo issues
+        required_files = [wav_filepath, midi_filepath]
+        if skip_existing and all(exists(fp) for fp in required_files):
+            # If MusicXML exists too, that's a bonus, but not required
             return True
         
-        # Write files
-        music.write(wav_filepath, kind = "audio")
-        music.write(midi_filepath, kind = "midi")
-        music.write(mxl_filepath, kind = "musicxml")
+        # Debug: Validate music object before writing
+        logging.debug(f"Writing music files for {output_dir}/{prefix}")
+        logging.debug(f"  Music object: {type(music)}")
+        logging.debug(f"  Number of tracks: {len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}")
+        logging.debug(f"  Resolution: {getattr(music, 'resolution', 'N/A')}")
+        logging.debug(f"  Song length: {getattr(music, 'song_length', 'N/A')}")
+        
+        # Check for potential issues
+        if hasattr(music, 'tracks') and len(music.tracks) == 0:
+            logging.warning(f"Music object has no tracks for {output_dir}/{prefix}")
+        
+        # Check for empty music objects
+        total_notes = 0
+        if hasattr(music, 'tracks'):
+            total_notes = sum(len(track.notes) if hasattr(track, 'notes') else 0 for track in music.tracks)
+        
+        if len(music.tracks) == 0 or total_notes == 0:
+            logging.warning(f"Empty music object detected for {output_dir}/{prefix}, skipping file writing")
+            return False
+        
+        # Count notes per track for debugging
+        if hasattr(music, 'tracks'):
+            for i, track in enumerate(music.tracks):
+                note_count = len(track.notes) if hasattr(track, 'notes') else 0
+                logging.debug(f"  Track {i}: {note_count} notes")
+                if note_count == 0:
+                    logging.warning(f"Track {i} has no notes for {output_dir}/{prefix}")
+        
+        # Check for valid tempo before writing MusicXML
+        musicxml_skip = False
+        if hasattr(music, 'tempos') and len(music.tempos) > 0:
+            for tempo in music.tempos:
+                if hasattr(tempo, 'qpm') and (tempo.qpm == 0 or tempo.qpm is None):
+                    logging.warning(f"Invalid tempo detected: {tempo.qpm}, will skip MusicXML for {output_dir}/{prefix}")
+                    musicxml_skip = True
+                    break
+        
+        # Write files with individual error handling
+        try:
+            logging.debug(f"  Writing audio file: {wav_filepath}")
+            music.write(wav_filepath, kind = "audio")
+            logging.debug(f"  Successfully wrote audio file")
+        except Exception as e:
+            logging.error(f"Failed to write audio file {wav_filepath}: {e}")
+            logging.error(f"  Music object details: tracks={len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}, resolution={getattr(music, 'resolution', 'N/A')}")
+            raise
+        
+        try:
+            logging.debug(f"  Writing MIDI file: {midi_filepath}")
+            music.write(midi_filepath, kind = "midi")
+            logging.debug(f"  Successfully wrote MIDI file")
+        except Exception as e:
+            logging.error(f"Failed to write MIDI file {midi_filepath}: {e}")
+            logging.error(f"  Music object details: tracks={len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}, resolution={getattr(music, 'resolution', 'N/A')}")
+            raise
+        
+        try:
+            if musicxml_skip:
+                logging.debug(f"  Skipping MusicXML file due to invalid tempo: {mxl_filepath}")
+            else:
+                logging.debug(f"  Writing MusicXML file: {mxl_filepath}")
+                music.write(mxl_filepath, kind = "musicxml")
+                logging.debug(f"  Successfully wrote MusicXML file")
+        except Exception as e:
+            logging.error(f"Failed to write MusicXML file {mxl_filepath}: {e}")
+            logging.error(f"  Music object details: tracks={len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}, resolution={getattr(music, 'resolution', 'N/A')}")
+            # Don't raise for MusicXML errors, continue with other files
+            logging.warning(f"  Continuing without MusicXML file")
         
         return True
         
     except Exception as e:
-        logging.error(f"Failed to write music files for {prefix}: {e}")
+        logging.error(f"Failed to write music files for {output_dir}/{prefix}: {e}")
+        logging.error(f"  Exception type: {type(e).__name__}")
+        import traceback
+        logging.error(f"  Traceback: {traceback.format_exc()}")
         return False
 
 def process_single_sample(
@@ -203,13 +276,26 @@ def process_single_sample(
         # Create output directory
         makedirs(output_dir, exist_ok = True)
         
+        # Debug: Log sequence information before decoding
+        logging.debug(f"Decoding generated sequence for {stem}")
+        logging.debug(f"  Generated data shape: {generated_data.shape}")
+        logging.debug(f"  Generated data type: {type(generated_data)}")
+        logging.debug(f"  First 10 elements: {generated_data[:10] if len(generated_data) > 10 else generated_data}")
+        
         # Decode the full generated sequence
-        generated_music = decode.decode(
-            codes = generated_data,
-            encoding = encoding,
-            infer_metrical_time = True,
-            unidimensional_decoding_function = unidimensional_decoding_function
-        )
+        try:
+            generated_music = decode.decode(
+                codes = generated_data,
+                encoding = encoding,
+                infer_metrical_time = True,
+                unidimensional_decoding_function = unidimensional_decoding_function
+            )
+            logging.debug(f"  Successfully decoded generated sequence")
+        except Exception as e:
+            logging.error(f"Failed to decode generated sequence for {stem}: {e}")
+            logging.error(f"  Generated data shape: {generated_data.shape}")
+            logging.error(f"  Generated data sample: {generated_data[:20] if len(generated_data) > 20 else generated_data}")
+            raise
         
         # Write "after" files (full sequence)
         success_after = write_music_files(
@@ -225,13 +311,26 @@ def process_single_sample(
         # Write "before" files only if this is not a joint model (joint models use prefix_default which is just SOS token)
         is_empty = eval_type == "joint"
         if not is_empty:
+            # Debug: Log prefix sequence information before decoding
+            logging.debug(f"Decoding prefix sequence for {stem}")
+            logging.debug(f"  Prefix data shape: {prefix_data.shape}")
+            logging.debug(f"  Prefix data type: {type(prefix_data)}")
+            logging.debug(f"  First 10 elements: {prefix_data[:10] if len(prefix_data) > 10 else prefix_data}")
+            
             # Decode the prefix sequence
-            prefix_music = decode.decode(
-                codes = prefix_data,
-                encoding = encoding,
-                infer_metrical_time = True,
-                unidimensional_decoding_function = unidimensional_decoding_function
-            )
+            try:
+                prefix_music = decode.decode(
+                    codes = prefix_data,
+                    encoding = encoding,
+                    infer_metrical_time = True,
+                    unidimensional_decoding_function = unidimensional_decoding_function
+                )
+                logging.debug(f"  Successfully decoded prefix sequence")
+            except Exception as e:
+                logging.error(f"Failed to decode prefix sequence for {stem}: {e}")
+                logging.error(f"  Prefix data shape: {prefix_data.shape}")
+                logging.error(f"  Prefix data sample: {prefix_data[:20] if len(prefix_data) > 20 else prefix_data}")
+                raise
             
             # Write "before" files (prefix only)
             success_before = write_music_files(
@@ -264,11 +363,25 @@ if __name__ == "__main__":
     # parse the command-line arguments
     args = parse_args()
 
+    # set up the logger
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level = log_level,
+        format = "%(message)s",
+        handlers = [logging.StreamHandler(stream = sys.stdout)])
+    
+    if args.debug:
+        logging.info("Debug logging enabled - this will provide detailed information about processing steps")
+
     # create output directory structure
     # Determine experiment type from paths or use default
     experiment_dir = dirname(args.paths)
     experiment_type = basename(experiment_dir)  # Default, could be determined from args.paths
     output_base_dir = f"{args.output_dir}/{experiment_type}"
+    if args.reset:
+        if exists(output_base_dir):
+            logging.info(f"Removing existing output directory because --reset was specified: {output_base_dir}")
+            rmtree(output_base_dir)
     
     # make sure the output directory exists
     if not exists(output_base_dir):
@@ -277,13 +390,11 @@ if __name__ == "__main__":
     # Define the 7 model configurations
     with open(f"{experiment_dir}/models/models.txt", "r") as f:
         MODEL_CONFIGS = [line.strip() for line in f.readlines() if line.strip()]
+        MODEL_CONFIGS = sorted(MODEL_CONFIGS)
 
     # load the encoding
     encoding_filepath = f"{experiment_dir}/encoding.json"
     encoding = representation.load_encoding(filepath = encoding_filepath) if exists(encoding_filepath) else representation.get_encoding()
-
-    # set up the logger
-    logging.basicConfig(level = logging.INFO, format = "%(message)s", handlers = [logging.FileHandler(filename = f"{output_base_dir}/generate_demo_samples_all.log", mode = "a"), logging.StreamHandler(stream = sys.stdout)])
 
     # log command called and arguments, save arguments
     logging.info(f"Running command: python {' '.join(sys.argv)}")
@@ -313,13 +424,24 @@ if __name__ == "__main__":
     ##################################################
 
     # iterate over each model configuration
+    logging.info(LINE)
+    
+    # Track success/failure counts for each model
+    model_results = {}
+    
     for model_name in MODEL_CONFIGS:
-        logging.info(LINE)
         logging.info(f"Processing model: {model_name}")
         
         # determine the eval type for this model
         eval_type = determine_model_config(model_name)
         logging.info(f"  Using eval type: {eval_type}")
+        
+        # Initialize counters for this model
+        model_results[model_name] = {
+            "eval_type": eval_type,
+            "total_processed": 0,
+            "total_successful": 0
+        }
         
         # create model output directory
         model_output_dir = f"{output_base_dir}/{model_name}"
@@ -330,9 +452,11 @@ if __name__ == "__main__":
         model_train_args_filepath = f"{experiment_dir}/models/{model_name}/train_args.json"
         if not exists(model_train_args_filepath):
             logging.warning(f"Training arguments not found for {model_name}, skipping...")
+            model_results[model_name]["total_processed"] = 0
+            model_results[model_name]["total_successful"] = 0
             continue
             
-        logging.info(f"Loading training arguments from: {model_train_args_filepath}")
+        logging.debug(f"Loading training arguments from: {model_train_args_filepath}")
         model_train_args = utils.load_json(filepath = model_train_args_filepath)
         
         # create model-specific dataset
@@ -371,6 +495,8 @@ if __name__ == "__main__":
         model_checkpoint_filepath = f"{model_checkpoint_dir}/best_model.{train.PARTITIONS[1]}.pth"
         if not exists(model_checkpoint_filepath):
             logging.warning(f"Checkpoint not found for {model_name}, skipping...")
+            model_results[model_name]["total_processed"] = 0
+            model_results[model_name]["total_successful"] = 0
             continue
             
         model_state_dict = torch.load(f = model_checkpoint_filepath, map_location = device, weights_only = True)
@@ -387,7 +513,9 @@ if __name__ == "__main__":
         model_expressive_feature_token = encoding["type_code_map"][representation.EXPRESSIVE_FEATURE_TYPE_STRING]
         model_conditional_on_controls = (bool(model_train_args.get("conditional", False)) or bool(model_train_args.get("econditional", False)))
         model_notes_are_controls = bool(model_train_args.get("econditional", False))
-        model_event_tokens = torch.tensor(data = (model_note_token, model_grace_note_token) if (not model_notes_are_controls) else (model_expressive_feature_token,), device = device)
+        # For prefix extraction, we always want to count note tokens as events, regardless of controls
+        # This ensures we extract meaningful musical prefixes with actual notes
+        model_event_tokens = torch.tensor(data = (model_note_token, model_grace_note_token), device = device)
         model_is_anticipation = (model_conditioning == encode.CONDITIONINGS[-1])
         model_sigma = model_train_args["sigma"]
         model_unidimensional_encoding_function, model_unidimensional_decoding_function = representation.get_unidimensional_coding_functions(encoding = encoding)
@@ -409,7 +537,12 @@ if __name__ == "__main__":
             n_iterations = (int((args.n_samples - 1) / args.batch_size) + 1) if args.n_samples is not None else len(model_test_data_loader)
             total_samples_processed = 0
             total_successful_samples = 0
-            for i in tqdm(iterable = range(n_iterations), desc = f"Generating samples for {model_name}"):
+            
+            # Create custom progress bar for samples
+            total_samples_to_process = args.n_samples if args.n_samples is not None else len(model_test_dataset)
+            pbar = tqdm(total = total_samples_to_process, desc = f"Generating samples for {model_name}")
+            
+            for i in range(n_iterations):
                 
                 # get new batch
                 batch = next(model_test_iter)
@@ -437,7 +570,7 @@ if __name__ == "__main__":
                 last_sos_token_indicies, last_prefix_indicies = utils.rep(x = -1, times = len(batch["seq"])), utils.rep(x = -1, times = len(batch["seq"]))
                 for seq_index in range(len(last_prefix_indicies)):
                     for j in range(model_type_dim, batch["seq"].shape[1], model_model.decoder.net.n_tokens_per_event):
-                        current_event_type = batch["seq"][seq_index, j + model_type_dim] if model_unidimensional else batch["seq"][seq_index, j, model_type_dim]
+                        current_event_type = batch["seq"][seq_index, j] if model_unidimensional else batch["seq"][seq_index, j, model_type_dim]
                         if (n_events_so_far[seq_index] > args.prefix_len) or (current_event_type == model_eos): # make sure the prefix isn't too long, or if end of song token, no end of song tokens in prefix
                             last_prefix_indicies[seq_index] = j - model_model.decoder.net.n_tokens_per_event
                             break
@@ -446,6 +579,17 @@ if __name__ == "__main__":
                             last_prefix_indicies[seq_index] = j # update last prefix index
                         elif current_event_type == model_sos:
                             last_sos_token_indicies[seq_index] = j
+                # Debug: Log prefix calculation details
+                logging.debug(f"Prefix calculation debug:")
+                logging.debug(f"  last_sos_token_indicies: {last_sos_token_indicies}")
+                logging.debug(f"  last_prefix_indicies: {last_prefix_indicies}")
+                logging.debug(f"  model_event_tokens: {model_event_tokens}")
+                logging.debug(f"  model_note_token: {model_note_token}, model_grace_note_token: {model_grace_note_token}")
+                logging.debug(f"  model_expressive_feature_token: {model_expressive_feature_token}")
+                logging.debug(f"  model_notes_are_controls: {model_notes_are_controls}")
+                logging.debug(f"  n_events_so_far: {n_events_so_far}")
+                
+                # Use simple prefix calculation matching evaluate.py
                 prefix_conditional_default = [batch["seq"][seq_index, last_sos_token_indicies[seq_index]:(last_prefix_indicies[seq_index] + model_model.decoder.net.n_tokens_per_event)] for seq_index in range(len(last_prefix_indicies))] # truncate to last prefix for each sequence in batch
                 for seq_index in range(len(prefix_conditional_default)):
                     if len(prefix_conditional_default[seq_index]) == 0: # make sure the prefix conditional default is not just empty
@@ -455,29 +599,56 @@ if __name__ == "__main__":
                 # determine prefix based on model type
                 joint = (eval_type == "joint")
                 if joint: # joint
-                    prefix = prefix_default
+                    prefix = prefix_conditional_default # instead of prefix_default # For prefix and anticipation models, use the extracted prefix instead of just SOS token
+                    # prefix = prefix_default # SOS token only, instead of meaningful musical prefix
                 else: # conditional
                     conditional_type, generation_type = eval_type.split("_")[1:]
+                    
+                    # Debug: Log prefix filtering information
+                    logging.debug(f"Conditional type: {conditional_type}, Generation type: {generation_type}")
+                    logging.debug(f"Model note token: {model_note_token}, grace note token: {model_grace_note_token}, expressive feature token: {model_expressive_feature_token}")
+                    
                     if conditional_type == CONDITIONAL_TYPES[1]: # conditional on notes only
-                        prefix = pad(data = [prefix_conditional[(model_get_type_field(prefix_conditional = prefix_conditional) != model_expressive_feature_token)] for prefix_conditional in prefix_conditional_default]).to(device)
+                        # Filter out expressive features, keep notes
+                        filtered_prefixes = []
+                        for i, prefix_conditional in enumerate(prefix_conditional_default):
+                            type_field = model_get_type_field(prefix_conditional = prefix_conditional)
+                            logging.debug(f"  Prefix {i} type field: {type_field}")
+                            mask = (type_field != model_expressive_feature_token)
+                            logging.debug(f"  Prefix {i} mask: {mask}")
+                            filtered_prefix = prefix_conditional[mask]
+                            logging.debug(f"  Prefix {i} filtered shape: {filtered_prefix.shape}")
+                            filtered_prefixes.append(filtered_prefix)
+                        prefix = pad(data = filtered_prefixes).to(device)
                     elif conditional_type == CONDITIONAL_TYPES[2]: # conditional on expressive features only
-                        prefix = pad(data = [prefix_conditional[torch.logical_and(input = (model_get_type_field(prefix_conditional = prefix_conditional) != model_note_token), other = (model_get_type_field(prefix_conditional = prefix_conditional) != model_grace_note_token))] for prefix_conditional in prefix_conditional_default]).to(device)
+                        # Filter out notes, keep expressive features
+                        filtered_prefixes = []
+                        for i, prefix_conditional in enumerate(prefix_conditional_default):
+                            type_field = model_get_type_field(prefix_conditional = prefix_conditional)
+                            logging.debug(f"  Prefix {i} type field: {type_field}")
+                            mask = torch.logical_and(input = (type_field != model_note_token), other = (type_field != model_grace_note_token))
+                            logging.debug(f"  Prefix {i} mask: {mask}")
+                            filtered_prefix = prefix_conditional[mask]
+                            logging.debug(f"  Prefix {i} filtered shape: {filtered_prefix.shape}")
+                            filtered_prefixes.append(filtered_prefix)
+                        prefix = pad(data = filtered_prefixes).to(device)
                     else: # conditional on everything
                         prefix = prefix_conditional_default
-
-                # skip irrelevant eval types
-                if model_conditional_on_controls and (
-                    joint or 
-                    (((model_notes_are_controls) and (generation_type in (GENERATION_TYPES[0], GENERATION_TYPES[1]))) or # notes are controls and generation is notes
-                     ((not model_notes_are_controls) and (generation_type == (GENERATION_TYPES[0], GENERATION_TYPES[2]))) # expressive features are controls and generation is expressive features
-                    )):
-                    continue
 
                 ##################################################
 
                 # GENERATION
                 ##################################################
 
+                # Debug: Log generation parameters
+                logging.debug(f"Generation parameters:")
+                logging.debug(f"  seq_len: {args.seq_len}")
+                logging.debug(f"  prefix shape: {prefix.shape}")
+                logging.debug(f"  joint: {joint}")
+                logging.debug(f"  notes_are_controls: {model_notes_are_controls}")
+                logging.debug(f"  is_anticipation: {model_is_anticipation}")
+                logging.debug(f"  sigma: {model_sigma}")
+                
                 # generate new samples
                 generated = model_model.generate(
                     seq_in = prefix,
@@ -492,6 +663,11 @@ if __name__ == "__main__":
                     is_anticipation = model_is_anticipation,
                     sigma = model_sigma
                 )
+                
+                # Debug: Log generation results
+                logging.debug(f"Generated shape: {generated.shape}")
+                logging.debug(f"Expected generation length: {args.seq_len - prefix.shape[1]}")
+                logging.debug(f"Actual generation length: {generated.shape[1]}")
 
                 # concatenate generation to prefix
                 generated = torch.cat(tensors = (prefix, generated), dim = 1).cpu().numpy() # wrangle a bit
@@ -526,11 +702,36 @@ if __name__ == "__main__":
                 success_count = sum(success for _, success in results)
                 total_samples_processed += len(generated)
                 total_successful_samples += success_count
+                
+                # Update model-specific counters
+                model_results[model_name]["total_processed"] += len(generated)
+                model_results[model_name]["total_successful"] += success_count
+                
+                # Update progress bar
+                pbar.update(len(generated))
             
-            # Log final results for this model
-            logging.info(f"Model {model_name}: Processed {total_successful_samples}/{total_samples_processed} samples successfully")
+        # close progress bar and log final results for this model
+        pbar.close()
+        logging.info(f"Model {model_name}: Processed {model_results[model_name]['total_successful']}/{model_results[model_name]['total_processed']} samples successfully")
+        logging.info(LINE)
 
     logging.info("Sample generation completed!")
-    logging.info(LINE)
+    
+    # Display final summary for all models
+    logging.info("\nGenerated Demo Samples Summary:")
+    total_all_processed = 0
+    total_all_successful = 0
+    
+    for model_name, results in model_results.items():
+        processed = results["total_processed"]
+        successful = results["total_successful"]
+        eval_type = results["eval_type"]
+        success_rate = (successful / processed * 100) if processed > 0 else 0
+        
+        total_all_processed += processed
+        total_all_successful += successful
+        
+        logging.info(f"  - {model_name} ({eval_type}): {successful}/{processed} ({success_rate:3.1f}%)")
+    
 
 ##################################################
