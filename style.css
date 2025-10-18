@@ -342,7 +342,8 @@ td {
 }
 
 .section-subtitle {
-  margin-top: 25px;
+  margin-top: 30px;
+  text-align: center;
 }
 
 /* subsection and main text spacing */
