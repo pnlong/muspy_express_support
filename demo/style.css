@@ -376,4 +376,16 @@ td {
 
 .sheet-music-image {
   max-width: 600px;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Make carousel captions black */
+.carousel-caption {
+  color: black !important;
+}
+
+.carousel-caption p {
+  color: black !important;
 }
