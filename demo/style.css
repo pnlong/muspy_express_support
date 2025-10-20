@@ -170,6 +170,20 @@ td {
     color: #62dbff !important;
 }
 
+/* Position carousel controls outside the image area */
+.image-slider-margins .carousel-control-prev {
+    left: -50px !important;
+}
+
+.image-slider-margins .carousel-control-next {
+    right: -50px !important;
+}
+
+.image-slider-margins .carousel-control-prev, 
+.image-slider-margins .carousel-control-next {
+    width: 50px !important;
+}
+
 .audio-carousel-indicators{
     bottom: -30px !important;
 }
@@ -377,17 +391,17 @@ td {
 
 /* explicit hooks for margins on specific subsection columns */
 .image-slider-margins {
-  margin-top: 20px;
+  margin-top: 50px;
   max-width: 350px;
 }
 
 .audio-carousel-margins {
-  margin-top: 20px;
+  margin-top: 50px;
   max-width: 550px;
 }
 
 .download-carousel-margins {
-  margin-top: 20px;
+  margin-top: 50px;
   max-width: 550px;
 }
 
