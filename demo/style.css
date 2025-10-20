@@ -405,6 +405,10 @@ td {
   max-width: 550px;
 }
 
+.download-carousel-margins .carousel-caption {
+  margin-top: 15px !important;
+}
+
 .sheet-music-image {
   max-width: 800px;
   width: 100%;
