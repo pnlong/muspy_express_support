@@ -151,7 +151,7 @@ td {
 
 /* carousel */
 .carousel-indicators {
-    bottom: -10px !important;
+    bottom: -20px !important;
 }
 
 .carousel-indicators li {
@@ -174,8 +174,16 @@ td {
     bottom: -30px !important;
 }
 
+.download-carousel-indicators{
+  bottom: -30px !important;
+}
+
 .audio-carousel-caption{
     top: 100% !important;
+}
+
+.download-carousel-caption{
+  top: 100% !important;
 }
 
 /* slider */
@@ -374,6 +382,11 @@ td {
 }
 
 .audio-carousel-margins {
+  margin-top: 20px;
+  max-width: 550px;
+}
+
+.download-carousel-margins {
   margin-top: 20px;
   max-width: 550px;
 }
