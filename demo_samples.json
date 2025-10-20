@@ -1,0 +1,36 @@
+{
+    "baseline": {
+        "metrical": "0_3",
+        "real": "0_5"
+    },
+    "joint": {
+        "prefix": {
+            "metrical": "0_1",
+            "real": "0_2"
+        },
+        "anticipation": {
+            "metrical": "0_1",
+            "real": "0_2"
+        }
+    },
+    "conditional": {
+        "prefix": {
+            "metrical": "0_1",
+            "real": "0_0"
+        },
+        "anticipation": {
+            "metrical": "0_1",
+            "real": "0_0"
+        }
+    },
+    "econditional": {
+        "prefix": {
+            "metrical": "0_6",
+            "real": "0_4"
+        },
+        "anticipation": {
+            "metrical": "0_6",
+            "real": "0_4"
+        }
+    }
+}
