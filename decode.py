@@ -11,6 +11,7 @@ import numpy as np
 from pretty_midi import note_number_to_name
 import argparse
 from typing import List, Callable
+import logging
 
 from os.path import dirname, realpath
 import sys
@@ -273,7 +274,12 @@ def reconstruct(
                         absolute_to_metrical_time = get_absolute_to_metrical_time_func(start_time = time, start_time_seconds = time_seconds, qpm = music.tempos[-1].qpm / FERMATA_TEMPO_SLOWDOWN)
                         fermata_on, fermata_time = True, time_seconds
                 case "Tempo":
-                    tempo_obj = muspy_express.classes.Tempo(time = time, qpm = representation.TEMPO_QPM_MAP[value], text = value)
+                    qpm_value = representation.TEMPO_QPM_MAP[value]
+                    # Safety check: ensure QPM is finite and reasonable
+                    if qpm_value is None or qpm_value <= 0 or qpm_value > 300 or np.isinf(qpm_value) or np.isnan(qpm_value):
+                        logging.warning(f"Invalid tempo QPM detected: {qpm_value} for tempo '{value}', using default 120 QPM")
+                        qpm_value = representation.DEFAULT_QPM
+                    tempo_obj = muspy_express.classes.Tempo(time = time, qpm = qpm_value, text = value)
                     if time == 0:
                         music.tempos[0] = tempo_obj
                     else:

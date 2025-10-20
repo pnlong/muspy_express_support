@@ -28,6 +28,7 @@ import numpy as np
 import torch
 import torch.utils.data
 from tqdm import tqdm
+import math
 
 # Suppress x_transformers FutureWarning about deprecated torch.cuda.amp.autocast
 warnings.filterwarnings("ignore", category=FutureWarning, module="x_transformers")
@@ -35,7 +36,13 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="x_transformers
 # Suppress musicxml MIDI channel warnings
 warnings.filterwarnings("ignore", message="WARNING: we are out of midi channels! help!", module="musicxml.m21ToXml")
 
-from read_mscz.music import MusicExpress
+# Add muspy2 to path
+from os.path import dirname, realpath
+import sys
+sys.path.insert(0, "/home/pnlong")
+
+from muspy2 import muspy as muspy_express
+MusicExpress = muspy_express.Music
 import dataset
 import music_x_transformers
 import representation
@@ -114,7 +121,8 @@ def write_music_files_silenced(
     music: MusicExpress,
     output_dir: str,
     prefix: str,
-    skip_existing: bool = True
+    skip_existing: bool = True,
+    model_name: str = None
 ) -> bool:
     """
     Write music object to WAV, MIDI, and MusicXML files with suppressed fluidsynth warnings.
@@ -174,14 +182,50 @@ def write_music_files_silenced(
                 if note_count == 0:
                     logging.warning(f"Track {i} has no notes for {output_dir}/{prefix}")
         
-        # Check for valid tempo before writing MusicXML
+        # Comprehensive validation and fixing of music object before writing files
         musicxml_skip = False
+        
+        # Add default tempo for econditional models if needed
+        if model_name and "econditional" in model_name and (not hasattr(music, 'tempos') or len(music.tempos) == 0):
+            music.tempos = [muspy_express.classes.Tempo(time=0, qpm=120)]  # Default tempo
+            logging.debug(f"Added default tempo for econditional model: {output_dir}/{prefix}")
+        
+        # Fix invalid tempo values
         if hasattr(music, 'tempos') and len(music.tempos) > 0:
             for tempo in music.tempos:
-                if hasattr(tempo, 'qpm') and (tempo.qpm == 0 or tempo.qpm is None):
-                    logging.warning(f"Invalid tempo detected: {tempo.qpm}, will skip MusicXML for {output_dir}/{prefix}")
-                    musicxml_skip = True
-                    break
+                if hasattr(tempo, 'qpm'):
+                    if tempo.qpm is None or tempo.qpm <= 0 or tempo.qpm > 300 or math.isinf(tempo.qpm) or math.isnan(tempo.qpm):
+                        logging.warning(f"Invalid tempo detected: {tempo.qpm}, fixing to 120 QPM for {output_dir}/{prefix}")
+                        tempo.qpm = 120  # Fix invalid tempo to default value
+        
+        # Fix invalid time signatures
+        if hasattr(music, 'time_signatures') and len(music.time_signatures) > 0:
+            for i, ts in enumerate(music.time_signatures):
+                if (hasattr(ts, 'numerator') and hasattr(ts, 'denominator') and 
+                    (ts.numerator is None or ts.denominator is None or 
+                     ts.numerator <= 0 or ts.denominator <= 0 or 
+                     math.isinf(ts.numerator) or math.isinf(ts.denominator) or
+                     math.isnan(ts.numerator) or math.isnan(ts.denominator))):
+                    logging.warning(f"Invalid time signature detected: {ts.numerator}/{ts.denominator}, fixing to 4/4 for {output_dir}/{prefix}")
+                    ts.numerator = 4
+                    ts.denominator = 4
+        
+        # Additional safety: ensure at least one valid time signature exists
+        if not hasattr(music, 'time_signatures') or len(music.time_signatures) == 0:
+            logging.warning(f"No time signatures found, adding default 4/4 for {output_dir}/{prefix}")
+            music.time_signatures = [muspy_express.classes.TimeSignature(time=0, numerator=4, denominator=4)]
+        
+        # Validate key signatures
+        if hasattr(music, 'key_signatures') and len(music.key_signatures) > 0:
+            for ks in music.key_signatures:
+                if hasattr(ks, 'fifths') and (ks.fifths is None or math.isinf(ks.fifths) or math.isnan(ks.fifths)):
+                    logging.warning(f"Invalid key signature fifths: {ks.fifths}, fixing to 0 for {output_dir}/{prefix}")
+                    ks.fifths = 0
+        
+        # Additional safety: ensure at least one valid key signature exists
+        if not hasattr(music, 'key_signatures') or len(music.key_signatures) == 0:
+            logging.warning(f"No key signatures found, adding default C major for {output_dir}/{prefix}")
+            music.key_signatures = [muspy_express.classes.KeySignature(time=0, fifths=0)]
         
         # Write files with individual error handling and suppressed fluidsynth warnings
         try:
@@ -204,12 +248,9 @@ def write_music_files_silenced(
             raise
         
         try:
-            if musicxml_skip:
-                logging.debug(f"  Skipping MusicXML file due to invalid tempo: {mxl_filepath}")
-            else:
-                logging.debug(f"  Writing MusicXML file: {mxl_filepath}")
-                music.write(mxl_filepath, kind = "musicxml")
-                logging.debug(f"  Successfully wrote MusicXML file")
+            logging.debug(f"  Writing MusicXML file: {mxl_filepath}")
+            music.write(mxl_filepath, kind = "musicxml")
+            logging.debug(f"  Successfully wrote MusicXML file")
         except Exception as e:
             logging.error(f"Failed to write MusicXML file {mxl_filepath}: {e}")
             logging.error(f"  Music object details: tracks={len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}, resolution={getattr(music, 'resolution', 'N/A')}")
@@ -431,7 +472,8 @@ def analyze_generation_results(prefix_data: np.array, generated_data: np.array, 
         # Check model-specific expectations
         is_conditional = "conditional" in model_name and "econditional" not in model_name
         is_econditional = "econditional" in model_name
-        is_joint = "joint" in model_name or (not is_conditional and not is_econditional)
+        is_baseline = "baseline" in model_name
+        is_joint = ("joint" in model_name or (not is_conditional and not is_econditional)) and not is_baseline
         
         if is_conditional:
             # Conditional models should generate notes but not expressive features
@@ -446,6 +488,17 @@ def analyze_generation_results(prefix_data: np.array, generated_data: np.array, 
                 logging.warning(f"  ⚠ Econditional model generated {new_notes} notes (should be 0)")
             else:
                 logging.info(f"  ✓ Econditional model correctly generated 0 notes")
+                
+        elif is_baseline:
+            # Baseline models should generate notes but not expressive features
+            if new_expressive > 0:
+                logging.warning(f"  ⚠ Baseline model generated {new_expressive} expressive features (should be 0)")
+            else:
+                logging.info(f"  ✓ Baseline model correctly generated 0 expressive features")
+            if new_notes > 0:
+                logging.info(f"  ✓ Baseline model generated {new_notes} notes")
+            else:
+                logging.warning(f"  ⚠ Baseline model generated no new notes")
                 
         elif is_joint:
             # Joint models can generate both
@@ -541,7 +594,8 @@ def write_music_files(
     music: MusicExpress,
     output_dir: str,
     prefix: str,
-    skip_existing: bool = True
+    skip_existing: bool = True,
+    model_name: str = None
 ) -> bool:
     """
     Write music object to WAV, MIDI, and MusicXML files.
@@ -603,14 +657,50 @@ def write_music_files(
                 if note_count == 0:
                     logging.warning(f"Track {i} has no notes for {output_dir}/{prefix}")
         
-        # Check for valid tempo before writing MusicXML
+        # Comprehensive validation and fixing of music object before writing files
         musicxml_skip = False
+        
+        # Add default tempo for econditional models if needed
+        if model_name and "econditional" in model_name and (not hasattr(music, 'tempos') or len(music.tempos) == 0):
+            music.tempos = [muspy_express.classes.Tempo(time=0, qpm=120)]  # Default tempo
+            logging.debug(f"Added default tempo for econditional model: {output_dir}/{prefix}")
+        
+        # Fix invalid tempo values
         if hasattr(music, 'tempos') and len(music.tempos) > 0:
             for tempo in music.tempos:
-                if hasattr(tempo, 'qpm') and (tempo.qpm == 0 or tempo.qpm is None):
-                    logging.warning(f"Invalid tempo detected: {tempo.qpm}, will skip MusicXML for {output_dir}/{prefix}")
-                    musicxml_skip = True
-                    break
+                if hasattr(tempo, 'qpm'):
+                    if tempo.qpm is None or tempo.qpm <= 0 or tempo.qpm > 300 or math.isinf(tempo.qpm) or math.isnan(tempo.qpm):
+                        logging.warning(f"Invalid tempo detected: {tempo.qpm}, fixing to 120 QPM for {output_dir}/{prefix}")
+                        tempo.qpm = 120  # Fix invalid tempo to default value
+        
+        # Fix invalid time signatures
+        if hasattr(music, 'time_signatures') and len(music.time_signatures) > 0:
+            for i, ts in enumerate(music.time_signatures):
+                if (hasattr(ts, 'numerator') and hasattr(ts, 'denominator') and 
+                    (ts.numerator is None or ts.denominator is None or 
+                     ts.numerator <= 0 or ts.denominator <= 0 or 
+                     math.isinf(ts.numerator) or math.isinf(ts.denominator) or
+                     math.isnan(ts.numerator) or math.isnan(ts.denominator))):
+                    logging.warning(f"Invalid time signature detected: {ts.numerator}/{ts.denominator}, fixing to 4/4 for {output_dir}/{prefix}")
+                    ts.numerator = 4
+                    ts.denominator = 4
+        
+        # Additional safety: ensure at least one valid time signature exists
+        if not hasattr(music, 'time_signatures') or len(music.time_signatures) == 0:
+            logging.warning(f"No time signatures found, adding default 4/4 for {output_dir}/{prefix}")
+            music.time_signatures = [muspy_express.classes.TimeSignature(time=0, numerator=4, denominator=4)]
+        
+        # Validate key signatures
+        if hasattr(music, 'key_signatures') and len(music.key_signatures) > 0:
+            for ks in music.key_signatures:
+                if hasattr(ks, 'fifths') and (ks.fifths is None or math.isinf(ks.fifths) or math.isnan(ks.fifths)):
+                    logging.warning(f"Invalid key signature fifths: {ks.fifths}, fixing to 0 for {output_dir}/{prefix}")
+                    ks.fifths = 0
+        
+        # Additional safety: ensure at least one valid key signature exists
+        if not hasattr(music, 'key_signatures') or len(music.key_signatures) == 0:
+            logging.warning(f"No key signatures found, adding default C major for {output_dir}/{prefix}")
+            music.key_signatures = [muspy_express.classes.KeySignature(time=0, fifths=0)]
         
         # Write files with individual error handling
         try:
@@ -632,12 +722,9 @@ def write_music_files(
             raise
         
         try:
-            if musicxml_skip:
-                logging.debug(f"  Skipping MusicXML file due to invalid tempo: {mxl_filepath}")
-            else:
-                logging.debug(f"  Writing MusicXML file: {mxl_filepath}")
-                music.write(mxl_filepath, kind = "musicxml")
-                logging.debug(f"  Successfully wrote MusicXML file")
+            logging.debug(f"  Writing MusicXML file: {mxl_filepath}")
+            music.write(mxl_filepath, kind = "musicxml")
+            logging.debug(f"  Successfully wrote MusicXML file")
         except Exception as e:
             logging.error(f"Failed to write MusicXML file {mxl_filepath}: {e}")
             logging.error(f"  Music object details: tracks={len(music.tracks) if hasattr(music, 'tracks') else 'N/A'}, resolution={getattr(music, 'resolution', 'N/A')}")
@@ -662,7 +749,8 @@ def process_single_sample(
     encoding: dict,
     sos_token: int,
     skip_existing: bool = True,
-    unidimensional_decoding_function: Callable = None
+    unidimensional_decoding_function: Callable = None,
+    model_name: str = None
 ) -> Tuple[str, bool]:
     """
     Process a single generated sample into before/after audio files.
@@ -739,7 +827,8 @@ def process_single_sample(
             music = generated_music,
             output_dir = output_dir,
             prefix = "after",
-            skip_existing = skip_existing
+            skip_existing = skip_existing,
+            model_name = model_name
         )
         
         if not success_after:
@@ -782,7 +871,8 @@ def process_single_sample(
                 music = prefix_music,
                 output_dir = output_dir,
                 prefix = "before",
-                skip_existing = skip_existing
+                skip_existing = skip_existing,
+                model_name = model_name
             )
             
             if not success_before:
@@ -1045,7 +1135,8 @@ if __name__ == "__main__":
                 is_anticipation_model = model_is_anticipation
                 is_conditional = ("conditional" in model_name) and ("econditional" not in model_name)
                 is_econditional = ("econditional" in model_name)
-                is_joint = (eval_type == "joint")
+                # Baseline models should not be joint - they only generate notes, not expressive features
+                is_joint = (eval_type == "joint") and ("baseline" not in model_name)
 
                 note_budget = args.prefix_len
                 expr_budget = max(1, int(args.prefix_len * args.expr_prefix_scale))
@@ -1066,7 +1157,7 @@ if __name__ == "__main__":
                     note_event_indices = event_positions[note_idx]
                     expr_event_indices = event_positions[expr_idx]
 
-                    if ("baseline" in model_name) and is_joint:
+                    if "baseline" in model_name:
                         # Baseline: first prefix_len notes only (drop expressive)
                         sel_notes = note_event_indices[:note_budget]
                         sel_event_indices = sel_notes
@@ -1142,15 +1233,26 @@ if __name__ == "__main__":
                 logging.debug(f"  notes_are_controls: {model_notes_are_controls}")
                 logging.debug(f"  is_anticipation: {model_is_anticipation}")
                 logging.debug(f"  sigma: {model_sigma}")
+                logging.debug(f"  temperature: {args.temperature}")
+                logging.debug(f"  filter_threshold: {args.filter_threshold}")
                 
                 # generate new samples
+                # Use standard generation parameters for all models
+                generation_temperature = args.temperature
+                generation_filter_thres = args.filter_threshold
+                logging.debug(f"  Using standard parameters: temp={generation_temperature}, filter_thres={generation_filter_thres}")
+                
+                # Determine EOS token usage
+                eos_token_to_use = None if "baseline" in model_name else model_eos
+                logging.debug(f"  EOS token: {'disabled' if eos_token_to_use is None else 'enabled'}")
+                
                 generated = model_model.generate(
                     seq_in = prefix,
                     seq_len = args.seq_len,
-                    eos_token = model_eos,
-                    temperature = args.temperature,
+                    eos_token = eos_token_to_use,  # Disable EOS for baseline to force full generation
+                    temperature = generation_temperature,
                     filter_logits_fn = args.filter,
-                    filter_thres = args.filter_threshold,
+                    filter_thres = generation_filter_thres,
                     monotonicity_dim = ("type", "time" if model_use_absolute_time else "beat"),
                     joint = is_joint,
                     notes_are_controls = model_notes_are_controls,
@@ -1194,7 +1296,8 @@ if __name__ == "__main__":
                         encoding = encoding,
                         sos_token = model_sos,
                         skip_existing = True,
-                        unidimensional_decoding_function = model_unidimensional_decoding_function
+                        unidimensional_decoding_function = model_unidimensional_decoding_function,
+                        model_name = model_name
                     )
                 
                 # Process samples in parallel

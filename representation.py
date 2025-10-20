@@ -111,7 +111,7 @@ TEMPO_QPM_MAP = { # each value is the maximum BPM before we go up a tempo, found
     "allegro": 156,
     "vivace": 176,
     "presto": 200,
-    "prestissimo": float("inf"), # some arbitrary large number
+    "prestissimo": 300, # reasonable upper bound instead of infinity
 }
 QPM_TEMPO_MAP = utils.inverse_dict(TEMPO_QPM_MAP)
 def QPM_TEMPO_MAPPER(qpm: float) -> str:
