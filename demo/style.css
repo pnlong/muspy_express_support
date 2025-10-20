@@ -172,11 +172,11 @@ td {
 
 /* Position carousel controls outside the image area */
 .image-slider-margins .carousel-control-prev {
-    left: -70px !important;
+    left: -80px !important;
 }
 
 .image-slider-margins .carousel-control-next {
-    right: -70px !important;
+    right: -80px !important;
 }
 
 .image-slider-margins .carousel-control-prev, 
