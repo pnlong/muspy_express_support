@@ -165,7 +165,12 @@ def get_y_label(expression_text_type: str) -> str:
 #     plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
 #     plt.close()
 
-def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, output_filepath: str):
+def plot_expression_text_types_boxplot(
+    data: pd.DataFrame,
+    column_to_use: str,
+    output_filepath: str,
+    transparent: bool = False,
+):
     """
     Plot expression text types as a split boxplot: main types and signature types in separate stacked plots.
 
@@ -177,6 +182,8 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, o
         Column name to use (either distance or duration for some timing metric)
     output_filepath : str
         Path to output file
+    transparent : bool, optional
+        Whether to make the plot transparent, by default False
     """
 
     # separate signature and non-signature types
@@ -197,7 +204,7 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, o
 
     # main plot (top)
     sns.boxplot(
-        data = main_data, x = column_to_use, y = "expression_text_type",
+        data = main_data, x = column_to_use, y = "expression_text_type", hue = "expression_text_type",
         orient = "h", order = main_order, showfliers = False, ax = ax_main,
     )
     ax_main.set_ylabel("Expression Text Type")
@@ -205,24 +212,26 @@ def plot_expression_text_types_boxplot(data: pd.DataFrame, column_to_use: str, o
     ax_main.tick_params(axis = "x", which = "both", bottom = False, top = False, labelbottom = False) # hide x-axis ticks and labels
 
     # format y-tick labels
+    tick_positions = ax_main.get_yticks()
     main_y_labels = [get_y_label(expression_text_type = label.get_text()) for label in ax_main.get_yticklabels()]
-    ax_main.set_yticklabels(main_y_labels)
+    ax_main.set_yticks(ticks = tick_positions, labels = main_y_labels)
 
     # signature plot (bottom)
     sns.boxplot(
-        data = signature_data, x = column_to_use, y = "expression_text_type",
+        data = signature_data, x = column_to_use, y = "expression_text_type", hue = "expression_text_type",
         orient = "h", order = signature_order, showfliers = False, ax = ax_sig,
     )
     ax_sig.set_ylabel("") # no y-axis label
     ax_sig.set_xlabel(get_x_label(column_to_use = column_to_use))
 
     # format y-tick labels
+    tick_positions = ax_sig.get_yticks()
     sig_y_labels = [get_y_label(expression_text_type = label.get_text()) for label in ax_sig.get_yticklabels()]
-    ax_sig.set_yticklabels(sig_y_labels)
+    ax_sig.set_yticks(ticks = tick_positions, labels = sig_y_labels)
 
     # adjust layout and save
     plt.tight_layout()
-    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
+    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight", transparent = transparent)
     plt.close()
 
 ##################################################
@@ -259,6 +268,7 @@ if __name__ == "__main__":
         parser.add_argument("--output_dir", type = str, default = OUTPUT_DIR, help = "Path to output directory.")
         parser.add_argument("--expression_text_types_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to expression text types file.")
         parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
+        parser.add_argument("--transparent", action = "store_true", help = "Make the plot transparent.")
         parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
@@ -286,7 +296,8 @@ if __name__ == "__main__":
     plot_expression_text_types_boxplot(
         data = dataset,
         column_to_use = DURATION_COLUMN_TO_USE,
-        output_filepath = f"{plots_dir}/expression_text_by_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf",
+        output_filepath = f"{plots_dir}/expression_text_by_type_durations" + ("_with_lyrics" if args.include_lyrics else "") + (".transparent" if args.transparent else "") + ".pdf",
+        transparent = args.transparent,
     )
     print("Completed making expression text type durations boxplot.")
 
@@ -295,7 +306,8 @@ if __name__ == "__main__":
     plot_expression_text_types_boxplot(
         data = dataset,
         column_to_use = DISTANCE_COLUMN_TO_USE,
-        output_filepath = f"{plots_dir}/expression_text_by_type_relative_density" + ("_with_lyrics" if args.include_lyrics else "") + ".pdf",
+        output_filepath = f"{plots_dir}/expression_text_by_type_relative_density" + ("_with_lyrics" if args.include_lyrics else "") + (".transparent" if args.transparent else "") + ".pdf",
+        transparent = args.transparent,
     )
     print("Completed making expression text type relative density boxplot.")
 

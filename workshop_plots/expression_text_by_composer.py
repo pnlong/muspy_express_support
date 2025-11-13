@@ -210,7 +210,7 @@ def get_composer_from_text(text: str) -> str:
 # PLOT EXPRESSION TEXT BY COMPOSER
 ##################################################
 
-def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath: str):
+def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath: str, transparent: bool = False):
     """
     Plot expression text by composer.
 
@@ -220,6 +220,8 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
         Dataframe with expression text types, assumed to have three columns: ["id", "composer", "expression_text_type"]
     output_filepath : str
         Path to output file
+    transparent : bool, optional
+        Whether to make the plot transparent, by default False
     """
     
     # create the horizontal boxplot
@@ -235,12 +237,13 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
         sorted_composers = data[["composer", "count"]].groupby(by = "composer").median().sort_values(by = "count", ascending = False).index.tolist()
 
     # make boxplot
-    sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = sorted_composers, showfliers = False)
+    sns.boxplot(data = data, x = "count", y = "composer", orient = "h", order = sorted_composers, showfliers = False, palette = "husl")
     
     # format the y-axis labels after plotting
     ax = plt.gca()
+    tick_positions = ax.get_yticks()
     y_labels = [FULL_COMPOSERS[label.get_text()] for label in ax.get_yticklabels()] # get full composer name
-    ax.set_yticklabels(labels = y_labels)
+    ax.set_yticks(ticks = tick_positions, labels = y_labels)
     
     # set labels
     plt.xlabel("Expression Text Count Per Song")
@@ -250,7 +253,7 @@ def plot_expression_text_by_composer_boxplot(data: pd.DataFrame, output_filepath
     plt.tight_layout()
     
     # save the plot
-    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight")
+    plt.savefig(output_filepath, dpi = LARGE_PLOTS_DPI, bbox_inches = "tight", transparent = transparent)
     plt.close()
     
 
@@ -290,6 +293,7 @@ if __name__ == "__main__":
         parser.add_argument("--expression_text_types_filepath", type = str, default = f"{OUTPUT_DIR}/{EXPRESSION_TEXT_TYPE_DATASET_NAME}.csv", help = "Path to expression text types file.")
         parser.add_argument("--include_lyrics", action = "store_true", help = "Include lyrics in the plot.")
         parser.add_argument("--include_signatures", action = "store_true", help = "Include time and key signatures in the plot.")
+        parser.add_argument("--transparent", action = "store_true", help = "Make the plot transparent.")
         parser.add_argument("--jobs", type = int, default = int(cpu_count() / 4), help = "Number of jobs to run in parallel.")
         parser.add_argument("--reset", action = "store_true", help = "Reset the output directory.")
         args = parser.parse_args(args = args, namespace = namespace) # parse arguments
@@ -346,7 +350,11 @@ if __name__ == "__main__":
 
     # make duration boxplot
     print("Making expression text by composer boxplot...")
-    plot_expression_text_by_composer_boxplot(data = dataset, output_filepath = f"{plots_dir}/expression_text_by_composer" + ("_with_lyrics" if args.include_lyrics else "") + ("_with_signatures" if args.include_signatures else "") + ".pdf")
+    plot_expression_text_by_composer_boxplot(
+        data = dataset,
+        output_filepath = f"{plots_dir}/expression_text_by_composer" + ("_with_lyrics" if args.include_lyrics else "") + ("_with_signatures" if args.include_signatures else "") + (".transparent" if args.transparent else "") + ".pdf",
+        transparent = args.transparent,
+    )
     print("Completed making expression text by composer boxplot.")
 
     # output statistics on song count by composer
